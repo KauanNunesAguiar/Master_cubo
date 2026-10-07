@@ -1,8 +1,12 @@
 #include <Arduino.h>
 #include <STM32FreeRTOS.h>
+#include <stdlib.h>
+#include <string.h>
 
+#include "Coords.h"
 #include "CubeState.h"
 #include "CubeView.h"
+#include "CubieCube.h"
 #include "TFT_FSMC.h"
 #include "TouchXPT2046.h"
 #include "stm32f4ve_peripherals.h"
@@ -35,6 +39,34 @@ CubeView cube(tft, cubeState);  // Corrigido: injetando o CubeState
 uint8_t selectedFace = FACE_F;  // Face padrão inicial (Front)
 volatile int encoderDelta = 0;
 bool lastClkState = HIGH;
+
+static bool inP2(uint8_t m) {
+	for (uint8_t i = 0; i < N_MOVES_P2; i++)
+		if (P2_MOVES[i] == m) return true;
+	return false;
+}
+
+static bool testCoord(CoordGet get, CoordSet set, uint16_t n, bool p2) {
+	CubieCube s;
+	if (get(s) != 0) return false;
+	for (int it = 0; it < 300; it++) {
+		CubieCube c;
+		for (int k = 0; k < 30; k++) c.multiply(moveCubie(p2 ? P2_MOVES[rand() % N_MOVES_P2] : rand() % N_MOVES));
+		uint16_t v = get(c);
+		if (v >= n) return false;
+		CubieCube d;
+		set(d, v);
+		if (get(d) != v) return false;  // ida e volta
+		for (uint8_t m = 0; m < N_MOVES; m++) {
+			if (p2 && !inP2(m)) continue;
+			CubieCube a = c, b = d;
+			a.multiply(moveCubie(m));
+			b.multiply(moveCubie(m));
+			if (get(a) != get(b)) return false;  // é o que a tabela de movimento assume
+		}
+	}
+	return true;
+}
 
 void taskTouch(void*) {
 	int16_t x, y;
