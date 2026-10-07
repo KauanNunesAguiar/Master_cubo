@@ -56,7 +56,7 @@ class CubeView {
 	bool _dirty = true;
 
 	// fila + animação
-	static const uint8_t QSIZE = 32;
+	static const uint8_t QSIZE = 64;
 	CubeMove _queue[QSIZE];
 	uint8_t _qHead = 0, _qCount = 0;
 	bool _animEnabled = true;

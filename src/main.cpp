@@ -95,6 +95,7 @@ void taskEncoder(void*) {
 
 		// --- CLIQUE DO BOTÃO DO ENCODER EMBARALHA O CUBO ---
 		if (digitalRead(ENCODER_SW) == LOW) {
+			srand(millis());
 			cube.scramble(20);  // Embaralha com 20 movimentos aleatórios
 			Serial.println("Cubo embaralhado!");
 			vTaskDelay(pdMS_TO_TICKS(400));  // Debounce robusto para evitar múltiplos cliques seguidos
@@ -133,6 +134,8 @@ void taskLed(void*) {
 void setup() {
 	Serial.begin(115200);
 	pinMode(LED_D2, OUTPUT);
+
+	CubeState::init();
 
 	tft.begin();
 	tft.setRotation(3);

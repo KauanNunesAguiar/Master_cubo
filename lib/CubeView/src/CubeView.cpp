@@ -1,7 +1,9 @@
 // CubeView.cpp
 #include "CubeView.h"
 
+#include <STM32FreeRTOS.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include <new>
 
@@ -88,9 +90,16 @@ void CubeView::setAngles(float axDeg, float ayDeg) {
 /* ---------------------- fila e animação --------------------------- */
 
 bool CubeView::pushMove(CubeMove m) {
-	if (_qCount >= QSIZE) return false;
+	taskENTER_CRITICAL();
+
+	if (_qCount >= QSIZE) {
+		taskEXIT_CRITICAL();
+		return false;
+	}
+
 	_queue[(_qHead + _qCount) % QSIZE] = m;
 	_qCount++;
+	taskEXIT_CRITICAL();
 	return true;
 }
 
@@ -113,12 +122,20 @@ bool CubeView::moves(const char* seq) {
 }
 
 void CubeView::scramble(uint8_t movesCount) {
-	_cube.scramble(movesCount);
-	_dirty = true;
+	int last = -1;
+	for (uint8_t i = 0; i < movesCount; i++) {
+		int f;
+		do { f = rand() % 6; } while (f == last);
+		last = f;
+		if (!pushMove({(uint8_t)f, (uint8_t)(1 + rand() % 3)})) break;
+	}
 }
 
 void CubeView::cancelMoves() {
+	taskENTER_CRITICAL();
 	_qCount = 0;
+	taskEXIT_CRITICAL();
+
 	_animating = false;
 	_layerDeg = 0;
 	_dirty = true;
@@ -136,9 +153,12 @@ void CubeView::setAnimation(bool enabled, uint16_t msPerQuarter) {
 }
 
 void CubeView::beginMove(uint32_t now) {
+	taskENTER_CRITICAL();
 	_cur = _queue[_qHead];
 	_qHead = (_qHead + 1) % QSIZE;
 	_qCount--;
+	taskEXIT_CRITICAL();
+
 	_animating = true;
 	_animStart = now;
 	_animDur = (uint32_t)_msQuarter * (_cur.turns == 2 ? 2 : 1);
@@ -152,8 +172,11 @@ void CubeView::update() {
 	if (!_animEnabled) {
 		while (_qCount) {
 			_cube.applyMove(_queue[_qHead]);
+			taskENTER_CRITICAL();
 			_qHead = (_qHead + 1) % QSIZE;
 			_qCount--;
+			taskEXIT_CRITICAL();
+
 			_dirty = true;
 		}
 	} else {

@@ -80,6 +80,8 @@ static void initTables() {
 
 /* ------------------------------------------------------------------ */
 
+void CubeState::init() { initTables(); }
+
 void CubeState::reset() {
 	for (uint8_t f = 0; f < 6; f++)
 		for (uint8_t i = 0; i < 9; i++) _s[f * 9 + i] = f;
@@ -116,6 +118,11 @@ bool CubeState::nextMove(const char*& p, CubeMove& m) {
 		turns = 2;
 		q++;
 		if (*q == '\'') q++;  // aceita "R2'" como R2
+	} else if (*q == '3') {
+		turns = 3;
+		q++;
+	} else if (*q == '1') {
+		q++;
 	}
 	if (*q && !isSpace(*q)) return false;  // ex.: "R2U" ou "RR"
 
@@ -160,31 +167,4 @@ bool CubeState::fromString(const char* s) {
 	}
 	memcpy(_s, tmp, 54);
 	return true;
-}
-
-void CubeState::scramble(uint8_t movesCount) {
-	static const char faces[] = {'U', 'R', 'F', 'D', 'L', 'B'};
-	static const char turns[] = {' ', '2', '\''};
-
-	char seq[movesCount * 3 + 1];
-	int idx = 0;
-	int lastFace = -1;
-
-	// Semeia o gerador aleatório (caso já não esteja no main)
-	srand(millis());
-
-	for (uint8_t i = 0; i < movesCount; i++) {
-		int f;
-		do { f = rand() % 6; } while (f == lastFace);  // Evita girar a mesma face duas vezes seguidas
-		lastFace = f;
-
-		seq[idx++] = faces[f];
-
-		char t = turns[rand() % 3];
-		if (t != ' ') { seq[idx++] = t; }
-		seq[idx++] = ' ';
-	}
-	seq[idx] = '\0';
-
-	applyMoves(seq);
 }

@@ -29,6 +29,7 @@ struct CubeMove {
 class CubeState {
    public:
 	CubeState() { reset(); }
+	static void init();
 
 	void reset();  // cubo resolvido
 
@@ -39,7 +40,6 @@ class CubeState {
 	void applyMove(uint8_t face, uint8_t turns = 1);
 	void applyMove(CubeMove m) { applyMove(m.face, m.turns); }
 	bool applyMoves(const char* seq);  // "R U R' U2 F". Se houver erro, não aplica nada e retorna false.
-	void scramble(uint8_t movesCount = 20);
 
 	/* Lê um movimento de *p e avança p. Retorna false no fim da string ou se for inválido
 	 * (nesse caso, *p aponta para o caractere ruim; no fim da string, *p == 0). */
