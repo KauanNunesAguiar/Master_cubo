@@ -107,8 +107,11 @@ Objetivo: visualizar o comportamento do algoritmo.
         Trocada por: taxa de poda por fase (F1 92%, F2 85% nos dados vistos) e
         fator de ramificação efetivo da última iteração completa da F1 (N^(1/D))
   [x] Exportar histograma por profundidade (CSV) pela serial no dump do WKUP
-  EV_P1_ITER + solverTracePrintCsv; falta validar no hardware
-  Dados de referência (1 busca): F1 158243 nós/146261 podas | F2 344540 nós/294534 podas
+  [x] Corrigido wrap do DWT (32 bits, 25,57 s a 168 MHz) em phase2: 
+        validado: F1+F2 = total
+  amif F1 3,14 (d10), poda validada; CSV validado no hardware
+  Dados de referência (1 busca): F1 158243 nós/146261 podas | F2 344540 nós/294534 podas 
+  Dado de referência novo: o tempo da busca varia de 2,4 s a 38 s conforme o G1 encontrado.
 
 ======================================================================
 ETAPA 7 - Reorganização de Libs, Tipos e Bitfields  [NÃO INICIADA]

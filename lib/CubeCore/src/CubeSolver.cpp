@@ -83,7 +83,6 @@ bool CubeSolver::phase2(uint8_t depth, int8_t lastFace) {
 	M_INC(solver.p2Calls);
 	S_EVT(EV_P1_G1, depth, 255);
 	M_SET(solver.sol1, depth);  // se esta chamada resolver, depth = giros da fase 1
-	M_TIC(t0);
 
 	const CubieCube& c = _cc[depth];
 	uint32_t sp = getSlicePerm(c);
@@ -94,13 +93,15 @@ bool CubeSolver::phase2(uint8_t depth, int8_t lastFace) {
 	bool ok = false;
 	for (uint8_t lim = h; lim <= _p2Max && depth + lim <= _maxDepth; lim++) {
 		M_INC(solver.p2Iters);
-		if (search2(depth, lim, lastFace)) {
+		M_TIC(ti);
+		bool r = search2(depth, lim, lastFace);
+		M_ADD(solver.p2Cycles, M_TOC(ti));
+		if (r) {
 			ok = true;
 			break;
 		}
 		if (_abort) break;
 	}
-	M_ADD(solver.p2Cycles, M_TOC(t0));
 	return ok;
 }
 
