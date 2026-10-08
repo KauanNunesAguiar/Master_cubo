@@ -55,7 +55,7 @@ Objetivo: padronizar e desacoplar dispositivos de entrada.
         FACE : giro = gira a face selecionada (horário/anti), clique = próxima face
   [ ] (adiado p/ Etapa 5) WKUP continua lido direto no taskMetrics
       Medido (words livres): input=308/384, dispatch=230/512 (ok)
- 
+
 ======================================================================
 ETAPA 4 - Reformulação do Display  [CONCLUÍDA]
 ======================================================================
@@ -73,15 +73,21 @@ Objetivo: eliminar gargalos de concorrência na interface gráfica.
           pilha display 700/1024 livres; bloqueio de troca durante solve OK
 
 ======================================================================
-ETAPA 5 - Tela de Debug  [NÃO INICIADA]
+ETAPA 5 - Tela de Debug  [QUASE CONCLUÍDA - validar pilhas novas]
 ======================================================================
 Objetivo: central de monitoramento em tempo real.
-  [ ] Contadores
-  [ ] Uso de stack das tasks
-  [ ] RAM livre
-  [ ] FPS
-  [ ] Tempos de busca
-  [ ] Estatísticas do cache de flash
+  [x] DebugScreen completa (atualiza a cada 500 ms, só redesenha linhas que mudaram):
+        heap FreeRTOS (livre/total/mín), RAM malloc, HUD (fps/quadro/push),
+        solver (tempos f1/f2, nós, G1), flash (leituras, média, % do tempo, cache sim),
+        pilhas livres/total de todas as tasks, eventos de input perdidos
+  [x] Limpeza das métricas de mutex (Metrics.h / Metrics.cpp)
+  [~] Ajustar pilhas (words). Medido em uso: usado = total - livre mínimo
+        display 324 | solve 471 | dispatch 284 | input 78 | led 23 | metrics ? (só mede com WKUP)
+        novos totais: display 768, solve 768, input 192, led 128; dispatch 512 e
+        metrics 768 mantidos. Economia ~5,3 KB de heap. Validar com a tela de debug.
+        Heap FreeRTOS: 119488 total, 16348 livre, mín = livre (nenhuma alocação em runtime)
+  [x] Dump serial por WKUP: MANTER (útil p/ colar logs e coletar dados do TCC);
+        reavaliar na Etapa 7
 
 ======================================================================
 ETAPA 6 - Árvore de Busca (Foco no TCC)  [NÃO INICIADA]
@@ -106,7 +112,7 @@ DIAGNÓSTICO ATUAL (logs recentes)
 - Soluções típicas: 20 a 23 giros
 - Tempos: ~1.6 s a 5 s+ no HUD; até 21 s nos testes antigos sem refinamento
 - Render: ~22 a 34 FPS; quadro médio ~10.3 ms (~4.6 ms em pushColors/FSMC)
- 
+
 ======================================================================
 PRÓXIMOS PASSOS SUGERIDOS
 ======================================================================
@@ -116,7 +122,7 @@ PRÓXIMOS PASSOS SUGERIDOS
   [ ] Reduzir custo de computação pura (rank nas fases 1 e 2)
   [ ] Corrigir itens críticos de confiabilidade (ver abaixo)
   [ ] Seguir para Etapa 3 (Input) e Etapa 4 (Display)
- 
+
 ----------------------------------------------------------------------
 CONFIABILIDADE (itens críticos pendentes)
 ----------------------------------------------------------------------
