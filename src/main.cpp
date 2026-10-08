@@ -7,8 +7,10 @@
 #include "CubeState.h"
 #include "CubeView.h"
 #include "CubieCube.h"
+#include "PruneTable.h"
 #include "TFT_FSMC.h"
 #include "TouchXPT2046.h"
+#include "W25Q16.h"
 #include "stm32f4ve_peripherals.h"
 
 /* ================================================================= *
@@ -166,6 +168,8 @@ void taskLed(void*) {
 void setup() {
 	Serial.begin(115200);
 	pinMode(LED_D2, OUTPUT);
+
+	coordsInit();
 
 	CubeState::init();
 

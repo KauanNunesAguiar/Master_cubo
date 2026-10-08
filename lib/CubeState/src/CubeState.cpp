@@ -1,7 +1,9 @@
 // CubeState.cpp
 #include "CubeState.h"
 
+#ifdef ARDUINO
 #include <Arduino.h>
+#endif
 #include <string.h>
 
 #include <cstdlib>
