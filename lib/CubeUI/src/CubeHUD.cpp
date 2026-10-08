@@ -54,6 +54,24 @@ const char* solverErr(int e) {
 			return "Erro";
 	}
 }
+
+const char* verifyErr(int v) {  // máx. 18 caracteres (largura da linha de status)
+	switch (v) {
+		case -2:
+			return "Aresta repetida";
+		case -3:
+			return "Aresta invertida";
+		case -4:
+			return "Canto repetido";
+		case -5:
+			return "Canto torcido";
+		case -6:
+			return "Paridade invalida";
+		default:
+			return "Cor/peca invalida";
+	}
+}
+
 }  // namespace
 
 CubeHUD::CubeHUD(TFT_FSMC& tft, CubeView& cube, CubeState& state, CubeSolver& solver, TouchXPT2046* touch)
@@ -89,7 +107,7 @@ void CubeHUD::solveTask(void* hud) {
 
 bool CubeHUD::inputLocked() const {
 	State s = _st;
-	return _solving || _scrambleActive || s == ST_SEARCHING || s == ST_SOLVING;
+	return _solving || _solveReq || _scrambleActive || s == ST_SEARCHING || s == ST_SOLVING;
 }
 
 uint32_t CubeHUD::elapsedMs() const {
@@ -202,18 +220,20 @@ void CubeHUD::onManualMove() {
 /* Procura a solução e a enfileira (roda na solveTask: demora de 2 a 15 s). */
 void CubeHUD::solveStep() {
 	if (!_solveReq) return;
+	_solving = true;  // trava ANTES de baixar _solveReq: não deixa janela destravada
 	_solveReq = false;
 
 	if (_cube.busy()) {
 		showMsg("Cubo ocupado");
+		_solving = false;
 		return;
 	}
 	if (_cs.isSolved()) {
 		showMsg("Ja esta resolvido");
+		_solving = false;
 		return;
 	}
 
-	_solving = true;  // trava giros manuais e embaralhar
 	_armed = false;
 	_tEnd = 0;
 	_tStart = _clickMs;  // o tempo conta desde o clique
@@ -230,7 +250,7 @@ void CubeHUD::solveStep() {
 
 	if (len < 0) {
 		Serial.printf("Solver erro %d (%lu ms)\n", len, (unsigned long)_lastSearchMs);
-		setError(solverErr(len));
+		setError(len == -1 ? verifyErr(_solver.verifyError()) : solverErr(len));
 	} else if (len == 0) {
 		_tEnd = millis();
 		_solvedAuto = true;

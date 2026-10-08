@@ -30,17 +30,17 @@ Objetivo: ferramentas de medição para embasar decisões técnicas.
          acerto; acessos à flash muito dispersos)
 
 ======================================================================
-ETAPA 2 - Melhorias no Solver  [EM ANDAMENTO]
+ETAPA 2 - Melhorias no Solver  [CONCLUÍDA]
 ======================================================================
 Objetivo: refinamentos lógicos e de desempenho no CubeCore.
   [x] Busca por soluções mais curtas após a primeira, com limite de tempo
       (refineMs)
   [x] Ajuste e medição do timing do FSMC (pushColors)
-  [~] Mapear erros do verify() para mensagens claras no HUD
-      (código enviado: CubeSolver::verifyError + verifyErr() no HUD + selftest 3)
-  [~] Gancho #if de eventos (SolverEvents.h, SOLVER_EVENTS=0 = custo zero)
-  [~] Remover setAddrWindow duplicado em CubeView::render
-  [~] Itens de confiabilidade (ver seção "Confiabilidade")
+  [x] Mapear erros do verify() para mensagens claras no HUD
+      (CubeSolver::verifyError + verifyErr() no HUD; selftest 3 OK: r=-1 err=-5)
+  [x] Gancho #if de eventos (SolverEvents.h, SOLVER_EVENTS=0 = custo zero)
+  [x] Remover setAddrWindow duplicado em CubeView::render
+  [x] Itens de confiabilidade (ver seção "Confiabilidade")
 
 ======================================================================
 ETAPA 3 - Camada de Input  [NÃO INICIADA]
@@ -85,6 +85,7 @@ Objetivo: otimização de memória/estruturas (somente no final).
       (sempre medindo o impacto na velocidade)
   [ ] Reorganização de bibliotecas
 
+
 ======================================================================
 DIAGNÓSTICO ATUAL (logs recentes)
 ======================================================================
@@ -107,10 +108,17 @@ PRÓXIMOS PASSOS SUGERIDOS
 ----------------------------------------------------------------------
 CONFIABILIDADE (itens críticos pendentes)
 ----------------------------------------------------------------------
-  [~] Pilha da taskEncoder (256 -> 512 words) + leitura de high-water mark das tasks
-  [~] Corrida solveStep x scramble/requestSolve (_solving antes de baixar _solveReq)
+  [x] Pilha da taskEncoder (256 -> 512 words) + high-water mark das tasks
+      (flag -D INCLUDE_uxTaskGetStackHighWaterMark=1 no platformio.ini)
+      Medido (words livres de ui/solve/render/enc): 666/1093/1879/449
+      Tamanhos atuais: 1024/1536/2048/512 -> sobra grande; reduzir só na
+      Etapa 5, com a tela de debug mostrando o mínimo ao vivo
+      (confirmar que o scramble pelo encoder foi exercitado antes de reduzir enc)
+  [x] Corrida solveStep x scramble/requestSolve (_solving antes de baixar _solveReq)
+      confirmado: botão do encoder durante "BUSCANDO" não causa nada nem erro
   [ ] (baixa prioridade) _msg/_err lidos pela UI enquanto outra task escreve
   [ ] (baixa prioridade) isSolved()/stickersOk() lidos durante applyMove (só cosmético)
+
 
 ======================================================================
 REGRAS DE TRABALHO

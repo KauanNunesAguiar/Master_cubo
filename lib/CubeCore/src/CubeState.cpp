@@ -1,9 +1,12 @@
 // CubeState.cpp
 #include "CubeState.h"
 
+#include "SolverEvents.h"
+
 #ifdef ARDUINO
 #include <Arduino.h>
 #endif
+
 #include <string.h>
 
 #include <cstdlib>

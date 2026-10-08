@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "Metrics.h"
+#include "SolverEvents.h"
 
 CubeSolver::CubeSolver(W25Q16& flash)
     : _ts{&flash, PRUNE_ADDR_TWIST_SLICE, 0},
@@ -17,7 +18,8 @@ CubeSolver::CubeSolver(W25Q16& flash)
       _nodes(0),
       _t0(0),
       _timeout(0),
-      _abort(false) {}
+      _abort(false),
+      _verr(0) {}
 
 void CubeSolver::begin() { coordsInit(); }
 
@@ -36,6 +38,7 @@ bool CubeSolver::tick() {
 bool CubeSolver::search1(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 	if (tick()) return false;
 	M_INC(solver.nodes1);
+	S_EVT(EV_P1_NODE, depth, depth ? _sol[depth - 1] : 255);
 	const CubieCube& c = _cc[depth];
 
 	if (remaining == 0) {
@@ -72,6 +75,7 @@ bool CubeSolver::search1(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 
 bool CubeSolver::phase2(uint8_t depth, int8_t lastFace) {
 	M_INC(solver.p2Calls);
+	S_EVT(EV_P1_G1, depth, 255);
 	M_SET(solver.sol1, depth);  // se esta chamada resolver, depth = giros da fase 1
 	M_TIC(t0);
 
@@ -97,6 +101,8 @@ bool CubeSolver::phase2(uint8_t depth, int8_t lastFace) {
 bool CubeSolver::search2(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 	if (tick()) return false;
 	M_INC(solver.nodes2);
+	S_EVT(EV_P2_NODE, depth, depth ? _sol[depth - 1] : 255);
+
 	const CubieCube& c = _cc[depth];
 	uint32_t sp = getSlicePerm(c);
 	uint8_t h1 = _cs.get((uint32_t)getCPerm(c) * N_SLICE_PERM + sp);
@@ -105,6 +111,7 @@ bool CubeSolver::search2(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 
 	if (h == 0) {  // as duas tabelas em 0 => cubo resolvido
 		_len = depth;
+		S_EVT(EV_SOLUTION, depth, 255);
 		return true;
 	}
 	if (h > remaining) return false;
@@ -140,7 +147,17 @@ bool CubeSolver::runStages(uint8_t maxDepth, uint8_t stFrom) {
 int CubeSolver::solve(const CubeState& s, char* out, size_t outLen, uint8_t maxDepth, uint32_t timeoutMs,
                       uint32_t refineMs) {
 	if (outLen == 0) return -4;
-	if (!_cc[0].fromFacelets(s) || _cc[0].verify() != 0) return -1;
+
+	_verr = 0;
+	if (!_cc[0].fromFacelets(s)) {
+		_verr = -1;
+		return -1;
+	}
+	int v = _cc[0].verify();
+	if (v != 0) {
+		_verr = (int8_t)v;
+		return -1;
+	}
 
 	if (maxDepth > 30) maxDepth = 30;
 	_nodes = 0;

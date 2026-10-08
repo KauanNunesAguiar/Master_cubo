@@ -43,6 +43,8 @@ Adafruit_NeoPixel m3_4(16, PC3, NEO_GRB + NEO_KHZ800);
 
 bool lastClkState = HIGH;
 
+static TaskHandle_t hUi, hSolve, hRender, hEnc;
+
 #if RUN_SELFTESTS
 static void selfTests() {
 	srand(12345);  // seed fixa: mesmo baseline em toda execução
@@ -100,6 +102,17 @@ static void selfTests() {
 			              (unsigned long)(sumLen / okCount), (unsigned long)(sumMs / okCount));
 		else
 			Serial.printf("RESUMO: 0/%d resolvidos\n", N);
+	}
+
+	// 3) verify(): canto torcido => solve() deve dar -1 com verifyError() = -5
+	{
+		CubeState bad;
+		bad.set(FACE_U, 8, FACE_R);
+		bad.set(FACE_R, 0, FACE_F);
+		bad.set(FACE_F, 2, FACE_U);
+		char sol[16];
+		int r = solver.solve(bad, sol, sizeof(sol));
+		Serial.printf("verify: r=%d err=%d (esperado -1 / -5)\n", r, solver.verifyError());
 	}
 }
 #endif
@@ -178,6 +191,9 @@ void taskMetrics(void*) {
 			metricsPrintRender(Serial);
 			metricsPrintSolve(Serial);
 			metricsResetRender();  // próxima leitura = nova janela
+			Serial.printf("[M] pilha livre minima (words): ui=%u solve=%u render=%u enc=%u\n",
+			              (unsigned)uxTaskGetStackHighWaterMark(hUi), (unsigned)uxTaskGetStackHighWaterMark(hSolve),
+			              (unsigned)uxTaskGetStackHighWaterMark(hRender), (unsigned)uxTaskGetStackHighWaterMark(hEnc));
 			vTaskDelay(pdMS_TO_TICKS(500));
 		}
 		vTaskDelay(pdMS_TO_TICKS(50));
@@ -292,11 +308,10 @@ void setup() {
 	hud.scrambleLen = 30;  // tamanho do embaralhamento
 	hud.begin(tftMutex);
 
-	xTaskCreate(taskLed, "led", 256, NULL, 1, NULL);
-	xTaskCreate(CubeHUD::uiTask, "ui", 1024, &hud, 2, NULL);
-	xTaskCreate(CubeHUD::solveTask, "solve", 1536, &hud, 1, NULL);
-	xTaskCreate(taskRender, "render", 2048, NULL, 1, NULL);
-	xTaskCreate(taskEncoder, "encoder", 256, NULL, 3, NULL);
+	xTaskCreate(CubeHUD::uiTask, "ui", 1024, &hud, 2, &hUi);
+	xTaskCreate(CubeHUD::solveTask, "solve", 1536, &hud, 1, &hSolve);
+	xTaskCreate(taskRender, "render", 2048, NULL, 1, &hRender);
+	xTaskCreate(taskEncoder, "encoder", 512, NULL, 3, &hEnc);
 #if METRICS_ENABLED
 	if (xTaskCreate(taskMetrics, "metrics", 768, NULL, 1, NULL) != pdPASS) {
 		Serial.println("Sem heap para taskMetrics");
