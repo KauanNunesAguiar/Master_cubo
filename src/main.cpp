@@ -1,12 +1,11 @@
 #include <Arduino.h>
 #include <STM32FreeRTOS.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "Coords.h"
+#include "CubeSolver.h"
 #include "CubeState.h"
 #include "CubeView.h"
-#include "CubieCube.h"
 #include "PruneTable.h"
 #include "TFT_FSMC.h"
 #include "TouchXPT2046.h"
@@ -30,45 +29,58 @@
 #define BTN_FACE_L PC0  // Laranja
 #define BTN_FACE_B PC2  // Azul
 
+/* Autotestes no boot (poda + solver). Ponha 0 para desligar. */
+#define RUN_SELFTESTS 1
+
 TouchXPT2046 touch;
 TFT_FSMC tft;
 SemaphoreHandle_t tftMutex;
 
 CubeState cubeState;
-CubeView cube(tft, cubeState);  // Corrigido: injetando o CubeState
+CubeView cube(tft, cubeState);
+
+W25Q16 flash;
+CubeSolver solver(flash);
 
 // Estado atual do controle
 uint8_t selectedFace = FACE_F;  // Face padrão inicial (Front)
 volatile int encoderDelta = 0;
 bool lastClkState = HIGH;
 
-static bool inP2(uint8_t m) {
-	for (uint8_t i = 0; i < N_MOVES_P2; i++)
-		if (P2_MOVES[i] == m) return true;
-	return false;
-}
-
-static bool testCoord(CoordGet get, CoordSet set, uint16_t n, bool p2) {
-	CubieCube s;
-	if (get(s) != 0) return false;
-	for (int it = 0; it < 300; it++) {
-		CubieCube c;
-		for (int k = 0; k < 30; k++) c.multiply(moveCubie(p2 ? P2_MOVES[rand() % N_MOVES_P2] : rand() % N_MOVES));
-		uint16_t v = get(c);
-		if (v >= n) return false;
-		CubieCube d;
-		set(d, v);
-		if (get(d) != v) return false;  // ida e volta
-		for (uint8_t m = 0; m < N_MOVES; m++) {
-			if (p2 && !inP2(m)) continue;
-			CubieCube a = c, b = d;
-			a.multiply(moveCubie(m));
-			b.multiply(moveCubie(m));
-			if (get(a) != get(b)) return false;  // é o que a tabela de movimento assume
+#if RUN_SELFTESTS
+static void selfTests() {
+	// 1) Poda: a profundidade de qualquer estado alcançado com k giros tem que ser <= k
+	{
+		PruneTable ts{&flash, PRUNE_ADDR_TWIST_SLICE}, fs{&flash, PRUNE_ADDR_FLIP_SLICE};
+		PruneTable cs{&flash, PRUNE_ADDR_CPERM_SP}, us{&flash, PRUNE_ADDR_UDPERM_SP};
+		bool ok = true;
+		for (int n = 0; n < 200 && ok; n++) {
+			int k = 1 + rand() % 6;
+			CubieCube c, d;
+			for (int i = 0; i < k; i++) c.multiply(moveCubie(rand() % N_MOVES));
+			for (int i = 0; i < k; i++) d.multiply(moveCubie(P2_MOVES[rand() % N_MOVES_P2]));
+			if (ts.get((uint32_t)getTwist(c) * N_SLICE + getSlice(c)) > k) ok = false;
+			if (fs.get((uint32_t)getFlip(c) * N_SLICE + getSlice(c)) > k) ok = false;
+			if (cs.get((uint32_t)getCPerm(d) * N_SLICE_PERM + getSlicePerm(d)) > k) ok = false;
+			if (us.get((uint32_t)getUDPerm(d) * N_SLICE_PERM + getSlicePerm(d)) > k) ok = false;
 		}
+		Serial.println(ok ? "poda OK" : "poda ERRO");
 	}
-	return true;
+
+	// 2) Solver: embaralha, resolve, aplica a solução e confere isSolved()
+	for (int n = 0; n < 5; n++) {
+		CubeState s;
+		for (int i = 0; i < 25; i++) s.applyMove(rand() % 6, 1 + rand() % 3);
+		char sol[128];
+		uint32_t t0 = millis();
+		int len = solver.solve(s, sol, sizeof(sol));
+		uint32_t dt = millis() - t0;
+		if (len >= 0) s.applyMoves(sol);
+		Serial.printf("len=%d  %lu ms  %lu nos  resolvido=%d\n  %s\n", len, (unsigned long)dt,
+		              (unsigned long)solver.nodes(), s.isSolved(), len >= 0 ? sol : "");
+	}
 }
+#endif
 
 void taskTouch(void*) {
 	int16_t x, y;
@@ -94,6 +106,7 @@ void taskRender(void*) {
 		vTaskDelay(pdMS_TO_TICKS(20));  // ~50 FPS
 	}
 }
+
 void taskButtons(void*) {
 	int8_t dir = 1;
 	bool lastWk = false;
@@ -108,7 +121,7 @@ void taskButtons(void*) {
 	}
 }
 
-// Tarefa para ler o Encoder KY-040 por interrupção ou polling otimizado
+// Tarefa para ler o Encoder KY-040 por polling
 void taskEncoder(void*) {
 	pinMode(ENCODER_CLK, INPUT_PULLUP);
 	pinMode(ENCODER_DT, INPUT_PULLUP);
@@ -129,10 +142,10 @@ void taskEncoder(void*) {
 
 		// --- CLIQUE DO BOTÃO DO ENCODER EMBARALHA O CUBO ---
 		if (digitalRead(ENCODER_SW) == LOW) {
-			srand(millis());
-			cube.scramble(20);  // Embaralha com 20 movimentos aleatórios
+			srand(millis());    // semente depende do momento do clique
+			cube.scramble(20);  // enfileira 20 movimentos aleatórios
 			Serial.println("Cubo embaralhado!");
-			vTaskDelay(pdMS_TO_TICKS(400));  // Debounce robusto para evitar múltiplos cliques seguidos
+			vTaskDelay(pdMS_TO_TICKS(400));  // Debounce
 		}
 
 		vTaskDelay(pdMS_TO_TICKS(2));
@@ -169,9 +182,13 @@ void setup() {
 	Serial.begin(115200);
 	pinMode(LED_D2, OUTPUT);
 
-	coordsInit();
+	CubeState::init();  // tabelas de permutação (uma vez, antes das tasks)
+	solver.begin();     // gera os giros em nível de peça
+	Serial.printf("flash %s\n", flash.begin() ? "OK" : "ERRO");
 
-	CubeState::init();
+#if RUN_SELFTESTS
+	selfTests();
+#endif
 
 	tft.begin();
 	tft.setRotation(3);
