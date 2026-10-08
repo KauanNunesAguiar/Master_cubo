@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "Metrics.h"
+
 /* ================================================================= *
  * Layout (320x240):                                                 *
  *   x 0..199   cubo (200x200) + botões de toque embaixo             *
@@ -224,6 +226,7 @@ void CubeHUD::solveStep() {
 	int len = _solver.solve(snap, _sol, sizeof(_sol));
 	_lastSearchMs = millis() - t0;
 	_lastNodes = _solver.nodes();
+	metricsPrintSolve(Serial);
 
 	if (len < 0) {
 		Serial.printf("Solver erro %d (%lu ms)\n", len, (unsigned long)_lastSearchMs);

@@ -7,6 +7,8 @@
 
 #include <new>
 
+#include "Metrics.h"
+
 struct V3 {
 	float x, y, z;
 };
@@ -205,6 +207,7 @@ void CubeView::update() {
 void CubeView::render(bool force) {
 	if (!_canvas || (!_dirty && !force)) return;
 	_dirty = false;
+	M_TIC(tRender);
 
 	const float d2r = 0.0174532925f;
 	const float cx = cosf(_ax * d2r), sx = sinf(_ax * d2r);
@@ -320,7 +323,10 @@ void CubeView::render(bool force) {
 	int16_t x0 = _customOrigin ? _x0 : (_tft.width() - _size) / 2;
 	int16_t y0 = _customOrigin ? _y0 : (_tft.height() - _size) / 2;
 	_tft.setAddrWindow(x0, y0, _size, _size);
+	M_TIC(tPush);
+	_tft.setAddrWindow(x0, y0, _size, _size);
 	_tft.pushColors(_canvas->getBuffer(), (uint32_t)_size * _size);
+	metricsRender(M_TOC(tRender), M_TOC(tPush));
 }
 
 void CubeView::alignCameraToFace(uint8_t face) {

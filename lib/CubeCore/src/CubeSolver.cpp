@@ -3,11 +3,13 @@
 
 #include <Arduino.h>
 
+#include "Metrics.h"
+
 CubeSolver::CubeSolver(W25Q16& flash)
-    : _ts{&flash, PRUNE_ADDR_TWIST_SLICE},
-      _fs{&flash, PRUNE_ADDR_FLIP_SLICE},
-      _cs{&flash, PRUNE_ADDR_CPERM_SP},
-      _us{&flash, PRUNE_ADDR_UDPERM_SP},
+    : _ts{&flash, PRUNE_ADDR_TWIST_SLICE, 0},
+      _fs{&flash, PRUNE_ADDR_FLIP_SLICE, 1},
+      _cs{&flash, PRUNE_ADDR_CPERM_SP, 2},
+      _us{&flash, PRUNE_ADDR_UDPERM_SP, 3},
       _len(0),
       _maxDepth(30),
       _p2Max(30),
@@ -32,6 +34,7 @@ bool CubeSolver::tick() {
 
 bool CubeSolver::search1(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 	if (tick()) return false;
+	M_INC(solver.nodes1);
 	const CubieCube& c = _cc[depth];
 	uint16_t tw = getTwist(c), fl = getFlip(c), sl = getSlice(c);
 
@@ -61,20 +64,32 @@ bool CubeSolver::search1(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 }
 
 bool CubeSolver::phase2(uint8_t depth, int8_t lastFace) {
+	M_INC(solver.p2Calls);
+	M_SET(solver.sol1, depth);  // se esta chamada resolver, depth = giros da fase 1
+	M_TIC(t0);
+
 	const CubieCube& c = _cc[depth];
 	uint32_t sp = getSlicePerm(c);
 	uint8_t h1 = _cs.get((uint32_t)getCPerm(c) * N_SLICE_PERM + sp);
 	uint8_t h2 = _us.get((uint32_t)getUDPerm(c) * N_SLICE_PERM + sp);
 	uint8_t h = h1 > h2 ? h1 : h2;
+
+	bool ok = false;
 	for (uint8_t lim = h; lim <= _p2Max && depth + lim <= _maxDepth; lim++) {
-		if (search2(depth, lim, lastFace)) return true;
-		if (_abort) return false;
+		M_INC(solver.p2Iters);
+		if (search2(depth, lim, lastFace)) {
+			ok = true;
+			break;
+		}
+		if (_abort) break;
 	}
-	return false;
+	M_ADD(solver.p2Cycles, M_TOC(t0));
+	return ok;
 }
 
 bool CubeSolver::search2(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 	if (tick()) return false;
+	M_INC(solver.nodes2);
 	const CubieCube& c = _cc[depth];
 	uint32_t sp = getSlicePerm(c);
 	uint8_t h1 = _cs.get((uint32_t)getCPerm(c) * N_SLICE_PERM + sp);
@@ -109,6 +124,15 @@ int CubeSolver::solve(const CubeState& s, char* out, size_t outLen, uint8_t maxD
 	_abort = false;
 	_t0 = millis();
 	_timeout = timeoutMs;
+	metricsResetSolve();
+
+	// registra o resultado nas métricas (vazio se METRICS_ENABLED=0)
+	auto done = [&](int rc) -> int {
+		M_SET(solver.totalMs, millis() - _t0);
+		M_SET(solver.result, rc);
+		M_SET(solver.solLen, rc >= 0 ? _len : 0);
+		return rc;
+	};
 
 	/* Escalonado: primeiro muitas soluções de fase 1 com fase 2 curta (barata);
 	 * só relaxa o limite da fase 2 se nada for encontrado. */
@@ -116,17 +140,18 @@ int CubeSolver::solve(const CubeState& s, char* out, size_t outLen, uint8_t maxD
 	bool found = false;
 	for (uint8_t st = 0; st < 4 && !found; st++) {
 		_p2Max = CAP[st];
+		M_SET(solver.stage, st);
 		uint8_t lim1 = (st < 3 && _maxDepth > 12) ? 12 : _maxDepth;
 		for (uint8_t d1 = 0; d1 <= lim1 && !found; d1++) {
 			found = search1(0, d1, -1);
-			if (_abort) return -2;
+			if (_abort) return done(-2);
 		}
 	}
-	if (!found) return -3;
+	if (!found) return done(-3);
 
 	size_t p = 0;
 	for (uint8_t i = 0; i < _len; i++) {
-		if (p + 4 > outLen) return -4;
+		if (p + 4 > outLen) return done(-4);
 		out[p++] = "URFDLB"[_sol[i] / 3];
 		uint8_t t = _sol[i] % 3;  // 0 = horário, 1 = 180°, 2 = anti-horário
 		if (t == 1)
@@ -137,5 +162,5 @@ int CubeSolver::solve(const CubeState& s, char* out, size_t outLen, uint8_t maxD
 	}
 	if (p) p--;  // tira o espaço final
 	out[p] = '\0';
-	return _len;
+	return done(_len);
 }

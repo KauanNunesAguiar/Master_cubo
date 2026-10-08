@@ -7,6 +7,7 @@
 #include "CubeSolver.h"
 #include "CubeState.h"
 #include "CubeView.h"
+#include "Metrics.h"
 #include "PruneTable.h"
 #include "TFT_FSMC.h"
 #include "TouchXPT2046.h"
@@ -59,6 +60,7 @@ static void selfTests() {
 
 	// 2) Solver: embaralha, resolve, aplica a solução e confere isSolved()
 	for (int n = 0; n < 5; n++) {
+		Serial.printf("Solver teste %d\n", n + 1);
 		CubeState s;
 		for (int i = 0; i < 25; i++) s.applyMove(rand() % 6, 1 + rand() % 3);
 		char sol[128];
@@ -139,13 +141,30 @@ static void calibrateTouch() {
 	tft.fillScreen(TFT_BLACK);
 }
 
+#if METRICS_ENABLED
+void taskMetrics(void*) {
+	for (;;) {
+		if (digitalRead(BTN_WKUP) == HIGH) {  // WKUP liga em 3V3
+			metricsPrintRender(Serial);
+			metricsPrintSolve(Serial);
+			metricsResetRender();  // próxima leitura = nova janela
+			vTaskDelay(pdMS_TO_TICKS(500));
+		}
+		vTaskDelay(pdMS_TO_TICKS(50));
+	}
+}
+#endif
+
 void taskRender(void*) {
 	cube.alignCameraToFace(FACE_U);
 
 	for (;;) {
+		M_TIC(t0);
 		xSemaphoreTake(tftMutex, portMAX_DELAY);
+		M_TIC(t1);
 		cube.update();
 		xSemaphoreGive(tftMutex);
+		metricsLock(t1 - t0, M_TOC(t1));
 
 		vTaskDelay(pdMS_TO_TICKS(20));  // ~50 FPS
 	}
@@ -185,9 +204,10 @@ void taskLed(void*) {
 }
 
 void setup() {
-	Serial.begin(115200);
 	pinMode(LED_D2, OUTPUT);
 
+	Serial.begin(115200);
+	metricsInit();
 	Serial.printf("SYSCLK: %lu Hz\n", (unsigned long)SystemCoreClock);
 
 	CubeState::init();  // tabelas de permutação (uma vez, antes das tasks)
@@ -225,6 +245,11 @@ void setup() {
 	xTaskCreate(CubeHUD::solveTask, "solve", 1536, &hud, 1, NULL);
 	xTaskCreate(taskRender, "render", 2048, NULL, 1, NULL);
 	xTaskCreate(taskEncoder, "encoder", 256, NULL, 3, NULL);
+#if METRICS_ENABLED
+	if (xTaskCreate(taskMetrics, "metrics", 768, NULL, 1, NULL) != pdPASS) {
+		Serial.println("Sem heap para taskMetrics");
+	}
+#endif
 
 	vTaskStartScheduler();
 }
