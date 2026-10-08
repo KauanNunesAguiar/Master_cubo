@@ -15,6 +15,7 @@ struct CubieCube {
 
 	void multiply(const CubieCube& b);                        // this = this * b (aplica b depois)
 	void multiplyP1(const CubieCube& a, const CubieCube& b);  // this = a*b só em co, eo, ep (cp NÃO é atualizado)
+	void multiplyP2(const CubieCube& a, const CubieCube& b);  // this = a*b só em cp, ep (fase 2: co/eo ignorados)
 	bool fromFacelets(const CubeState& s);                    // false se alguma peça não puder ser identificada
 	void toFacelets(CubeState& s) const;
 	int verify() const;  // 0 = ok; negativos = erro (códigos do Kociemba)

@@ -137,8 +137,7 @@ bool CubeSolver::search2(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 		uint8_t m = P2_MOVES[k];
 		int8_t face = m / 3;
 		if (!allowed(face, lastFace)) continue;
-		_cc[depth + 1] = c;
-		_cc[depth + 1].multiply(moveCubie(m));
+		_cc[depth + 1].multiplyP2(c, moveCubie(m));
 		_sol[depth] = m;
 		if (search2(depth + 1, remaining - 1, face)) return true;
 		if (_abort) return false;

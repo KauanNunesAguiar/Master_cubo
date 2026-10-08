@@ -59,6 +59,11 @@ void CubieCube::multiplyP1(const CubieCube& a, const CubieCube& b) {
 	}
 }
 
+void CubieCube::multiplyP2(const CubieCube& a, const CubieCube& b) {
+	for (uint8_t i = 0; i < 8; i++) cp[i] = a.cp[b.cp[i]];
+	for (uint8_t i = 0; i < 12; i++) ep[i] = a.ep[b.ep[i]];
+}
+
 bool CubieCube::fromFacelets(const CubeState& s) {
 	for (uint8_t i = 0; i < 8; i++) {
 		uint8_t ori = 0;

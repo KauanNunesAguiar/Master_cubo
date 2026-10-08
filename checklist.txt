@@ -18,6 +18,13 @@ Objetivo: melhorias de menor risco e alto ganho para gerar um novo baseline.
       5/5 resolvidos | média 22 giros (22,23,23,23,22) | média 2567 ms
       1a solução: 573 a 1673 ms | flash 34-35% do tempo, 2.39 us/leitura
       cache simulado: acerto 9-10% (descartado) | poda OK | ID TFT 009341
+      
+    BASELINE OFICIAL 2 (seed 12345, 30 giros, maxDepth 26, refine 1500 ms):
+      [após: corte antecipado h1 em search2 + multiplyP2 na fase 2]
+      5/5 resolvidos | média 22 giros (22,23,23,23,22) | média 2300 ms
+      1a solução: 439 a 1211 ms | flash 32-33% do tempo, 2.41 us/leitura
+      cache simulado: acerto 10-12% (descartado) | poda OK | ID TFT 009341
+      Variação vs baseline 1 (2567 ms): -10,4%
 
 ======================================================================
 ETAPA 1 - Instrumentação e Métricas  [CONCLUÍDA]
@@ -137,7 +144,8 @@ PRÓXIMOS PASSOS SUGERIDOS
         RESUMO 2399 ms vs baseline 2567 ms (-6,5%), mesmos 22 giros; us caiu para ~36% de cs.
   [x] Testar ordem us antes de cs
         RESUMO 2426 ms vs 2399 ms, sem ganho; cs e us cortam os mesmos nós; mantida a ordem cs→us
-  [ ] multiplyP2 na fase 2 (ignora co/eo)
+  [x] multiplyP2 na fase 2 (ignora co/eo)
+        RESUMO 2300 ms (-4,1% vs 2399 ms; -10,4% vs baseline 2567 ms), 5/5, 22 giros
   [ ] Reduzir custo de computação pura (rank)
         mover a tabela de cperm/udperm para a flash não cabe: as tabelas de poda já ocupam até cerca 
         de 0x1EE200 dos 2 MB. O rank fica como segunda opção, depois de medir o ganho do multiplyP2
