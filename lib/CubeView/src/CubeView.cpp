@@ -317,13 +317,8 @@ void CubeView::render(bool force) {
 		if (it.hasSticker) fillQuad(it.sx, it.sy, it.col);
 	}
 
-	_canvas->setTextSize(1);
-	_canvas->setTextColor(0xFFFF, 0x0000);  // Texto branco, fundo preto
-	_canvas->setCursor(5, 5);
-	_canvas->printf("Ax: %d Ay: %d", (int)_ax, (int)_ay);
-
-	int16_t x0 = (_tft.width() - _size) / 2;
-	int16_t y0 = (_tft.height() - _size) / 2;
+	int16_t x0 = _customOrigin ? _x0 : (_tft.width() - _size) / 2;
+	int16_t y0 = _customOrigin ? _y0 : (_tft.height() - _size) / 2;
 	_tft.setAddrWindow(x0, y0, _size, _size);
 	_tft.pushColors(_canvas->getBuffer(), (uint32_t)_size * _size);
 }

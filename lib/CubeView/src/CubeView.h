@@ -38,6 +38,14 @@ class CubeView {
 	void setAngles(float axDeg, float ayDeg);
 	void alignCameraToFace(uint8_t face);
 	void invalidate() { _dirty = true; }  // chame se alterar o CubeState diretamente
+	void setOrigin(int16_t x, int16_t y) {
+		_x0 = x;
+		_y0 = y;
+		_customOrigin = true;
+		_dirty = true;
+	}
+
+	uint8_t pending() const { return _qCount + (_animating ? 1 : 0); }  // giros que faltam (inclui o animando)
 
 	void update();                    // chamar sempre no loop(): avança a animação e redesenha se preciso
 	void render(bool force = false);  // só redesenha se algo mudou (update() já chama)
@@ -45,6 +53,9 @@ class CubeView {
    private:
 	void beginMove(uint32_t now);
 	bool pushMove(CubeMove m);
+
+	int16_t _x0 = 0, _y0 = 0;
+	bool _customOrigin = false;
 
 	TFT_FSMC& _tft;
 	CubeState& _cube;
