@@ -113,6 +113,12 @@ bool CubeSolver::search2(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 	const CubieCube& c = _cc[depth];
 	uint32_t sp = getSlicePerm(c);
 	uint8_t h1 = _cs.get((uint32_t)getCPerm(c) * N_SLICE_PERM + sp);
+
+	if (h1 > remaining) {
+		S_EVT(EV_P2_PRUNE, depth, 255);
+		return false;
+	}
+
 	uint8_t h2 = _us.get((uint32_t)getUDPerm(c) * N_SLICE_PERM + sp);
 	uint8_t h = h1 > h2 ? h1 : h2;
 

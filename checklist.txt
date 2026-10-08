@@ -133,8 +133,14 @@ DIAGNÓSTICO ATUAL (logs recentes)
 ======================================================================
 PRÓXIMOS PASSOS SUGERIDOS
 ======================================================================
-  [ ] Otimizar leitura da flash (h1 antes de h2)
+  [x] Otimizar leitura da flash (h1 antes de h2)
+        RESUMO 2399 ms vs baseline 2567 ms (-6,5%), mesmos 22 giros; us caiu para ~36% de cs.
+  [x] Testar ordem us antes de cs
+        RESUMO 2426 ms vs 2399 ms, sem ganho; cs e us cortam os mesmos nós; mantida a ordem cs→us
+  [ ] multiplyP2 na fase 2 (ignora co/eo)
   [ ] Reduzir custo de computação pura (rank)
+        mover a tabela de cperm/udperm para a flash não cabe: as tabelas de poda já ocupam até cerca 
+        de 0x1EE200 dos 2 MB. O rank fica como segunda opção, depois de medir o ganho do multiplyP2
   [ ] Corrigir itens críticos de confiabilidade (ver abaixo)
 
 ----------------------------------------------------------------------
