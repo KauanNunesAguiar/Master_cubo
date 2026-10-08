@@ -140,19 +140,6 @@ class TreeScreen : public Screen {
 		}
 	}
 
-	// razão média entre profundidades consecutivas (inclui repetições da busca iterativa)
-	static uint32_t branching100(const uint32_t* a) {
-		int dmin = 1, dmax = 0;
-		while (dmin < 32 && !a[dmin]) dmin++;
-		for (int d = 31; d >= 1; d--)
-			if (a[d]) {
-				dmax = d;
-				break;
-			}
-		if (dmin >= 32 || dmax <= dmin) return 0;
-		return (uint32_t)(powf((float)a[dmax] / (float)a[dmin], 1.0f / (float)(dmax - dmin)) * 100.0f);
-	}
-
 	void drawText(const SolverTrace& t, uint32_t now) {
 		static const char FC[7] = "URFDLB";
 
@@ -172,7 +159,7 @@ class TreeScreen : public Screen {
 		line(0, TFT_WHITE, "F%u d%-2u %s%s", (unsigned)t.curPhase + 1, (unsigned)t.curDepth, d0 > 1 ? ".. " : "", path);
 
 		// 1: últimos 10 eventos do buffer circular (N/P = fase 1 nó/poda, n/p = fase 2, G = G1, S = solução)
-		static const char EC[8] = {'N', 'G', 'n', 'S', 'P', 'p', '?', '?'};
+		static const char EC[8] = {'N', 'G', 'n', 'S', 'P', 'p', 'I', '?'};
 		char ev[48];
 		uint8_t q = 0;
 		uint32_t have = t.head < TRACE_RING ? t.head : TRACE_RING;
@@ -195,19 +182,12 @@ class TreeScreen : public Screen {
 		line(2, TFT_WHITE, "nos F1=%lu poda %lu | F2=%lu poda %lu", (unsigned long)n1, (unsigned long)p1,
 		     (unsigned long)n2, (unsigned long)p2);
 
-		// 3: ramificação média e % de poda nos últimos 64 eventos
-		uint32_t rn = 0, rp = 0;
-		for (uint8_t i = 1; i <= have; i++) {
-			uint8_t ty = t.ring[(t.head - i) & (TRACE_RING - 1)] & 7;
-			if (ty == EV_P1_NODE || ty == EV_P2_NODE)
-				rn++;
-			else if (ty == EV_P1_PRUNE || ty == EV_P2_PRUNE)
-				rp++;
-		}
-		uint32_t b1 = branching100(t.nodes[0]), b2 = branching100(t.nodes[1]);
-		line(3, TFT_WHITE, "ramif F1 %lu.%02lu  F2 %lu.%02lu  poda rec. %lu%%", (unsigned long)(b1 / 100),
-		     (unsigned long)(b1 % 100), (unsigned long)(b2 / 100), (unsigned long)(b2 % 100),
-		     (unsigned long)(rn ? rp * 100 / rn : 0));
+		uint32_t pr1 = n1 ? p1 * 100 / n1 : 0, pr2 = n2 ? p2 * 100 / n2 : 0;
+		uint32_t be = 0;  // fator de ramificação efetivo da última iteração completa da F1: N^(1/D)
+		if (t.lastIterDepth > 0 && t.lastIterNodes > 1)
+			be = (uint32_t)(powf((float)t.lastIterNodes, 1.0f / (float)t.lastIterDepth) * 100.0f);
+		line(3, TFT_WHITE, "poda F1 %lu%% F2 %lu%%  ramif F1 %lu.%02lu (d%u)", (unsigned long)pr1, (unsigned long)pr2,
+		     (unsigned long)(be / 100), (unsigned long)(be % 100), (unsigned)t.lastIterDepth);
 
 		// 4: status
 		uint32_t el = t.running ? now - t.t0 : t.t1 - t.t0;

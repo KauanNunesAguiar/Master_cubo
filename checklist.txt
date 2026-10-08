@@ -103,10 +103,11 @@ Objetivo: visualizar o comportamento do algoritmo.
   [x] Automático: SOLVE abre a Árvore ao vivo e volta ao HUD ~1,2 s após a busca
         (lingerMs soma ao cronômetro do HUD; autoReturn=false desliga)
   [x] Overhead dos eventos: RESUMO 2671 ms vs 2562 ms (+4,3%), mesmos 22 giros
-  [~] CORREÇÃO: 'ramif' (F1 0.94) era inválida (mistura iterações repetidas).
+  [x] CORREÇÃO: 'ramif' (F1 0.94) era inválida (mistura iterações repetidas).
         Trocada por: taxa de poda por fase (F1 92%, F2 85% nos dados vistos) e
         fator de ramificação efetivo da última iteração completa da F1 (N^(1/D))
-  [~] Exportar histograma por profundidade (CSV) pela serial no dump do WKUP
+  [x] Exportar histograma por profundidade (CSV) pela serial no dump do WKUP
+  EV_P1_ITER + solverTracePrintCsv; falta validar no hardware
   Dados de referência (1 busca): F1 158243 nós/146261 podas | F2 344540 nós/294534 podas
 
 ======================================================================
@@ -129,12 +130,9 @@ DIAGNÓSTICO ATUAL (logs recentes)
 ======================================================================
 PRÓXIMOS PASSOS SUGERIDOS
 ======================================================================
-  [ ] Atualizar selftest para usar os mesmos parâmetros do HUD (novo baseline)
-  [ ] Otimizar leitura da flash (ex.: ler só a tabela h2 quando h1 não podar,
-      cortando leituras redundantes)
-  [ ] Reduzir custo de computação pura (rank nas fases 1 e 2)
+  [ ] Otimizar leitura da flash (h1 antes de h2)
+  [ ] Reduzir custo de computação pura (rank)
   [ ] Corrigir itens críticos de confiabilidade (ver abaixo)
-  [ ] Seguir para Etapa 3 (Input) e Etapa 4 (Display)
 
 ----------------------------------------------------------------------
 CONFIABILIDADE (itens críticos pendentes)

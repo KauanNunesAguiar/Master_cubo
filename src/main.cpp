@@ -200,6 +200,7 @@ void taskMetrics(void*) {
 		if (digitalRead(BTN_WKUP) == HIGH) {  // WKUP liga em 3V3
 			metricsPrintRender(Serial);
 			metricsPrintSolve(Serial);
+			solverTracePrintCsv(Serial);
 			metricsResetRender();  // próxima leitura = nova janela
 			Serial.printf("[M] pilha livre minima (words): display=%u solve=%u in=%u disp=%u\n",
 			              (unsigned)uxTaskGetStackHighWaterMark(hDisplay),

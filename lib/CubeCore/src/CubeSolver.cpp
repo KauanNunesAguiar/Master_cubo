@@ -149,6 +149,7 @@ bool CubeSolver::runStages(uint8_t maxDepth, uint8_t stFrom) {
 		for (uint8_t d1 = 0; d1 <= lim1; d1++) {
 			if (search1(0, d1, -1)) return true;
 			if (_abort) return false;
+			S_EVT(EV_P1_ITER, d1, 255);
 		}
 	}
 	return false;
