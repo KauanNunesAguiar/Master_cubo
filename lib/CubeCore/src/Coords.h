@@ -19,6 +19,7 @@ uint16_t getFlip(const CubieCube& c);
 void setFlip(CubieCube& c, uint16_t v);
 uint16_t getSlice(const CubieCube& c);
 void setSlice(CubieCube& c, uint16_t v);
+
 // Fase 2 (udperm e sliceperm só valem com as arestas do meio já no meio)
 uint16_t getCPerm(const CubieCube& c);
 void setCPerm(CubieCube& c, uint16_t v);

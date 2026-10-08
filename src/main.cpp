@@ -1,3 +1,4 @@
+#include <Adafruit_NeoPixel.h>
 #include <Arduino.h>
 #include <STM32FreeRTOS.h>
 #include <stdlib.h>
@@ -36,10 +37,16 @@ CubeSolver solver(flash);
 
 CubeHUD hud(tft, cube, cubeState, solver, &touch);
 
+Adafruit_NeoPixel m1(8, PC0, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel m2(8, PC1, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel m3_4(16, PC3, NEO_GRB + NEO_KHZ800);
+
 bool lastClkState = HIGH;
 
 #if RUN_SELFTESTS
 static void selfTests() {
+	srand(12345);  // seed fixa: mesmo baseline em toda execução
+
 	// 1) Poda: a profundidade de qualquer estado alcançado com k giros tem que ser <= k
 	{
 		PruneTable ts{&flash, PRUNE_ADDR_TWIST_SLICE}, fs{&flash, PRUNE_ADDR_FLIP_SLICE};
@@ -58,18 +65,41 @@ static void selfTests() {
 		Serial.println(ok ? "poda OK" : "poda ERRO");
 	}
 
-	// 2) Solver: embaralha, resolve, aplica a solução e confere isSolved()
-	for (int n = 0; n < 5; n++) {
-		Serial.printf("Solver teste %d\n", n + 1);
-		CubeState s;
-		for (int i = 0; i < 25; i++) s.applyMove(rand() % 6, 1 + rand() % 3);
-		char sol[128];
-		uint32_t t0 = millis();
-		int len = solver.solve(s, sol, sizeof(sol));
-		uint32_t dt = millis() - t0;
-		if (len >= 0) s.applyMoves(sol);
-		Serial.printf("len=%d  %lu ms  %lu nos  resolvido=%d\n  %s\n", len, (unsigned long)dt,
-		              (unsigned long)solver.nodes(), s.isSolved(), len >= 0 ? sol : "");
+	// 2) Solver: mesmos parâmetros do HUD (embaralho de 30, maxDepth 26, timeout 60 s, refino 1500 ms)
+	{
+		const int N = 5;
+		int okCount = 0;
+		uint32_t sumMs = 0, sumLen = 0;
+		for (int n = 0; n < N; n++) {
+			Serial.printf("Solver teste %d\n", n + 1);
+			CubeState s;
+			int last = -1;
+			for (int i = 0; i < 30; i++) {  // igual ao HUD: sem repetir a face anterior
+				int f;
+				do { f = rand() % 6; } while (f == last);
+				last = f;
+				s.applyMove(f, 1 + rand() % 3);
+			}
+			char sol[128];
+			uint32_t t0 = millis();
+			int len = solver.solve(s, sol, sizeof(sol), 26, 60000, 1500);
+			uint32_t dt = millis() - t0;
+			if (len >= 0) s.applyMoves(sol);
+			bool solved = s.isSolved();
+			Serial.printf("len=%d  %lu ms  %lu nos  resolvido=%d\n  %s\n", len, (unsigned long)dt,
+			              (unsigned long)solver.nodes(), solved, len >= 0 ? sol : "");
+			metricsPrintSolve(Serial);
+			if (len >= 0 && solved) {
+				okCount++;
+				sumMs += dt;
+				sumLen += len;
+			}
+		}
+		if (okCount)
+			Serial.printf("RESUMO: %d/%d resolvidos, media %lu giros, %lu ms\n", okCount, N,
+			              (unsigned long)(sumLen / okCount), (unsigned long)(sumMs / okCount));
+		else
+			Serial.printf("RESUMO: 0/%d resolvidos\n", N);
 	}
 }
 #endif
@@ -197,15 +227,36 @@ void taskEncoder(void*) {
 }
 
 void taskLed(void*) {
+	uint8_t pos = 0;
+	m1.begin();
+	m2.begin();
+	m3_4.begin();
+	pinMode(LED_D2, OUTPUT);
+
 	for (;;) {
 		digitalToggle(LED_D2);
+		m1.setPixelColor(pos % 8, m1.Color(255, 0, 0));
+		m1.setPixelColor((pos - 1) % 8, m1.Color(0, 255, 0));
+		m1.setPixelColor((pos - 2) % 8, m1.Color(0, 0, 255));
+		m1.setPixelColor((pos - 3) % 8, m1.Color(0, 0, 0));
+		m1.show();
+		m2.setPixelColor(pos % 8, m2.Color(255, 0, 0));
+		m2.setPixelColor((pos - 1) % 8, m2.Color(0, 255, 0));
+		m2.setPixelColor((pos - 2) % 8, m2.Color(0, 0, 255));
+		m2.setPixelColor((pos - 3) % 8, m2.Color(0, 0, 0));
+		m2.show();
+		m3_4.setPixelColor(pos % 16, m3_4.Color(0, 0, 255));
+		m3_4.setPixelColor((pos - 1) % 16, m3_4.Color(0, 255, 0));
+		m3_4.setPixelColor((pos - 2) % 16, m3_4.Color(255, 0, 0));
+		m3_4.setPixelColor((pos - 3) % 16, m3_4.Color(0, 0, 0));
+		m3_4.show();
+
+		pos++;
 		vTaskDelay(pdMS_TO_TICKS(250));
 	}
 }
 
 void setup() {
-	pinMode(LED_D2, OUTPUT);
-
 	Serial.begin(115200);
 	metricsInit();
 	Serial.printf("SYSCLK: %lu Hz\n", (unsigned long)SystemCoreClock);

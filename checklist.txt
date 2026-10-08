@@ -1,0 +1,122 @@
+CHECKLIST DO PROJETO - Cubo Mágico STM32F4VE (Kociemba + TFT + W25Q16)
+Legenda: [x] feito | [~] parcial | [ ] pendente
+
+======================================================================
+ETAPA 0 - Ajustes Iniciais e Baseline  [CONCLUÍDA]
+======================================================================
+Objetivo: melhorias de menor risco e alto ganho para gerar um novo baseline.
+  [x] Escalonamento da Fase 2 (_p2Max com CAP)
+  [x] Filtro de repetição da Fase 1
+  [x] Tabela de combinações (g_cnk)
+  [x] SPI da flash em 42000000 Hz
+  [x] Otimização do compilador em -O2
+  [x] Verificação do clock do sistema (SYSCLK: 168000000 Hz, flash e poda OK)
+  [x] Selftest atualizado p/ mesmos parâmetros do HUD (30 giros de embaralho,
+      maxDepth 26, timeout 60 s, refineMs 1500, seed fixa) + métricas por teste
+  [x] Rodar RUN_SELFTESTS 1 e salvar o log como baseline
+  BASELINE OFICIAL (seed 12345, 30 giros, maxDepth 26, refine 1500 ms):
+      5/5 resolvidos | média 22 giros (22,23,23,23,22) | média 2567 ms
+      1a solução: 573 a 1673 ms | flash 34-35% do tempo, 2.39 us/leitura
+      cache simulado: acerto 9-10% (descartado) | poda OK | ID TFT 009341
+
+======================================================================
+ETAPA 1 - Instrumentação e Métricas  [CONCLUÍDA]
+======================================================================
+Objetivo: ferramentas de medição para embasar decisões técnicas.
+  [x] Struct de métricas globais (leituras de flash, nós por fase, tempos de
+      flash, render, pushColors, FPS e mutex)
+  [x] Coleta de dados para dimensionar cache de poda em RAM
+      -> DECISÃO: cache de poda em RAM DESCARTADO (simulação deu ~10% de
+         acerto; acessos à flash muito dispersos)
+
+======================================================================
+ETAPA 2 - Melhorias no Solver  [EM ANDAMENTO]
+======================================================================
+Objetivo: refinamentos lógicos e de desempenho no CubeCore.
+  [x] Busca por soluções mais curtas após a primeira, com limite de tempo
+      (refineMs)
+  [x] Ajuste e medição do timing do FSMC (pushColors)
+  [~] Mapear erros do verify() para mensagens claras no HUD
+      (código enviado: CubeSolver::verifyError + verifyErr() no HUD + selftest 3)
+  [~] Gancho #if de eventos (SolverEvents.h, SOLVER_EVENTS=0 = custo zero)
+  [~] Remover setAddrWindow duplicado em CubeView::render
+  [~] Itens de confiabilidade (ver seção "Confiabilidade")
+
+======================================================================
+ETAPA 3 - Camada de Input  [NÃO INICIADA]
+======================================================================
+Objetivo: padronizar e desacoplar dispositivos de entrada.
+  [ ] Centralizar touch e encoder em uma camada de eventos dedicada
+      (NOTA: K1 não está ligado a hud.requestSolve() no main.cpp, embora o HUD
+       mostre "K1 = resolver"; resolver na Etapa 3)
+  [ ] Simplificar leitura de pinos
+  [ ] Viabilizar modo manual de seleção de faces e giros
+
+======================================================================
+ETAPA 4 - Reformulação do Display  [NÃO INICIADA]
+======================================================================
+Objetivo: eliminar gargalos de concorrência na interface gráfica.
+  [ ] Task única gerenciadora do display com uso de mutex
+  [ ] Interface padrão (Screen) separando HUD, Debug e Visualização
+
+======================================================================
+ETAPA 5 - Tela de Debug  [NÃO INICIADA]
+======================================================================
+Objetivo: central de monitoramento em tempo real.
+  [ ] Contadores
+  [ ] Uso de stack das tasks
+  [ ] RAM livre
+  [ ] FPS
+  [ ] Tempos de busca
+  [ ] Estatísticas do cache de flash
+
+======================================================================
+ETAPA 6 - Árvore de Busca (Foco no TCC)  [NÃO INICIADA]
+======================================================================
+Objetivo: visualizar o comportamento do algoritmo.
+  [ ] Solver emite eventos para um buffer circular leve
+  [ ] Renderização resumida dos últimos nós ou por profundidade
+
+======================================================================
+ETAPA 7 - Reorganização de Libs, Tipos e Bitfields  [NÃO INICIADA]
+======================================================================
+Objetivo: otimização de memória/estruturas (somente no final).
+  [ ] Compactar CubieCube e outras estruturas com bitfields
+      (sempre medindo o impacto na velocidade)
+  [ ] Reorganização de bibliotecas
+
+======================================================================
+DIAGNÓSTICO ATUAL (logs recentes)
+======================================================================
+- Flash externa: ~35% do tempo total (média ~2.44 us por leitura)
+- Divisão de carga: ~40% Fase 1 / ~60% Fase 2
+- Soluções típicas: 20 a 23 giros
+- Tempos: ~1.6 s a 5 s+ no HUD; até 21 s nos testes antigos sem refinamento
+- Render: ~22 a 34 FPS; quadro médio ~10.3 ms (~4.6 ms em pushColors/FSMC)
+
+======================================================================
+PRÓXIMOS PASSOS SUGERIDOS
+======================================================================
+  [ ] Atualizar selftest para usar os mesmos parâmetros do HUD (novo baseline)
+  [ ] Otimizar leitura da flash (ex.: ler só a tabela h2 quando h1 não podar,
+      cortando leituras redundantes)
+  [ ] Reduzir custo de computação pura (rank nas fases 1 e 2)
+  [ ] Corrigir itens críticos de confiabilidade (ver abaixo)
+  [ ] Seguir para Etapa 3 (Input) e Etapa 4 (Display)
+
+----------------------------------------------------------------------
+CONFIABILIDADE (itens críticos pendentes)
+----------------------------------------------------------------------
+  [~] Pilha da taskEncoder (256 -> 512 words) + leitura de high-water mark das tasks
+  [~] Corrida solveStep x scramble/requestSolve (_solving antes de baixar _solveReq)
+  [ ] (baixa prioridade) _msg/_err lidos pela UI enquanto outra task escreve
+  [ ] (baixa prioridade) isSolved()/stickersOk() lidos durante applyMove (só cosmético)
+
+======================================================================
+REGRAS DE TRABALHO
+======================================================================
+- Enviar só trechos alterados (arquivo inteiro apenas se novo, mudança
+  extensa ou se for requisitado).
+- Em tarefas por etapas: começar pelo checklist e ir marcando.
+- Testes são feitos pelo usuário (Claude instrui antes).
+- Ao ficar sem tokens: PRIMEIRO atualizar o checklist.
