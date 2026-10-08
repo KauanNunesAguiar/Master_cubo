@@ -8,9 +8,12 @@
 #include "CubeSolver.h"
 #include "CubeState.h"
 #include "CubeView.h"
+#include "DebugScreen.h"
+#include "HudScreen.h"
 #include "InputManager.h"
 #include "Metrics.h"
 #include "PruneTable.h"
+#include "Screen.h"
 #include "TFT_FSMC.h"
 #include "TouchXPT2046.h"
 #include "W25Q16.h"
@@ -20,9 +23,10 @@
 #define RUN_SELFTESTS 1
 
 TFT_FSMC tft;
-SemaphoreHandle_t tftMutex;
 TouchXPT2046 touch;
 InputManager input(&touch);
+
+ScreenManager screens;
 W25Q16 flash;
 
 CubeState cubeState;
@@ -30,7 +34,10 @@ CubeView cube(tft, cubeState);
 CubeSolver solver(flash);
 CubeHUD hud(tft, cube, cubeState, solver);
 
-static TaskHandle_t hUi, hSolve, hRender, hIn, hDisp;  // tarefas: UI, solver, render, input, dispatcher
+DebugScreen debugScreen(tft);
+HudScreen hudScreen(cube, hud);
+
+static TaskHandle_t hDisplay, hSolve, hIn, hDisp;
 
 #if RUN_SELFTESTS
 static void selfTests() {
@@ -171,46 +178,12 @@ static void calibrateTouch() {
 	tft.fillScreen(TFT_BLACK);
 }
 
-enum UiMode : uint8_t { MODE_VIEW, MODE_FACE };
-static UiMode uiMode = MODE_VIEW;
-
-static void setMode(UiMode m) {
-	uiMode = m;
-	if (m == MODE_FACE) {
-		hud.selectFace(hud.face());  // alinha a câmera na face atual
-		hud.notify("Modo: FACE");
-	} else {
-		hud.notify("Modo: VISTA");
-	}
-}
-
 static void handleInput(const InputEvent& e) {
-	switch (e.type) {
-		case IN_ENC_ROT:
-			if (uiMode == MODE_VIEW)
-				cube.rotate(0, e.a > 0 ? 15.0f : -15.0f);
-			else
-				hud.turnSelected(e.a > 0);
-			break;
-		case IN_ENC_CLICK:
-			if (uiMode == MODE_VIEW)
-				hud.scramble();
-			else
-				hud.selectFace((hud.face() + 1) % 6);
-			break;
-		case IN_ENC_LONG:
-			setMode(uiMode == MODE_VIEW ? MODE_FACE : MODE_VIEW);
-			break;
-		case IN_K0:
-			hud.scramble();
-			break;
-		case IN_K1:
-			hud.requestSolve();
-			break;
-		case IN_TOUCH:
-			hud.onTouch(e.a, e.b);
-			break;
+	if (e.type == IN_K0_LONG) {  // troca de tela (global)
+		if (!screens.next()) hud.notify("Aguarde...");
+		return;
 	}
+	screens.onInput(e);
 }
 
 void taskDispatch(void*) {
@@ -226,9 +199,9 @@ void taskMetrics(void*) {
 			metricsPrintRender(Serial);
 			metricsPrintSolve(Serial);
 			metricsResetRender();  // próxima leitura = nova janela
-			Serial.printf("[M] pilha livre minima (words): ui=%u solve=%u render=%u in=%u disp=%u\n",
-			              (unsigned)uxTaskGetStackHighWaterMark(hUi), (unsigned)uxTaskGetStackHighWaterMark(hSolve),
-			              (unsigned)uxTaskGetStackHighWaterMark(hRender), (unsigned)uxTaskGetStackHighWaterMark(hIn),
+			Serial.printf("[M] pilha livre minima (words): display=%u solve=%u in=%u disp=%u\n",
+			              (unsigned)uxTaskGetStackHighWaterMark(hDisplay),
+			              (unsigned)uxTaskGetStackHighWaterMark(hSolve), (unsigned)uxTaskGetStackHighWaterMark(hIn),
 			              (unsigned)uxTaskGetStackHighWaterMark(hDisp));
 			vTaskDelay(pdMS_TO_TICKS(500));
 		}
@@ -236,21 +209,6 @@ void taskMetrics(void*) {
 	}
 }
 #endif
-
-void taskRender(void*) {
-	cube.alignCameraToFace(FACE_U);
-
-	for (;;) {
-		M_TIC(t0);
-		xSemaphoreTake(tftMutex, portMAX_DELAY);
-		M_TIC(t1);
-		cube.update();
-		xSemaphoreGive(tftMutex);
-		metricsLock(t1 - t0, M_TOC(t1));
-
-		vTaskDelay(pdMS_TO_TICKS(20));  // ~50 FPS
-	}
-}
 
 void taskLed(void*) {
 	pinMode(LED_D2, OUTPUT);
@@ -290,17 +248,18 @@ void setup() {
 	touch.setCalibration(205, 3954, 230, 3870, true, true, true);
 	if (digitalRead(BTN_K0) == LOW) calibrateTouch();  // segure K0 ao ligar
 
-	tftMutex = xSemaphoreCreateMutex();
-
 	// hud.touchButtons = false;  // desliga os botões na tela
 	// hud.celebrate = false;     // desliga o giro de comemoração
 	hud.scrambleLen = 30;  // tamanho do embaralhamento
-	hud.begin(tftMutex);
+	hud.begin();
+	cube.alignCameraToFace(FACE_U);  // era feito no início da taskRender
+	screens.add(&hudScreen);
+	screens.add(&debugScreen);
+
 	input.begin();
 
-	xTaskCreate(CubeHUD::uiTask, "ui", 1024, &hud, 2, &hUi);
+	xTaskCreate(ScreenManager::task, "display", 1024, &screens, 1, &hDisplay);
 	xTaskCreate(CubeHUD::solveTask, "solve", 1536, &hud, 1, &hSolve);
-	xTaskCreate(taskRender, "render", 2048, NULL, 1, &hRender);
 	xTaskCreate(InputManager::task, "input", 384, &input, 3, &hIn);
 	xTaskCreate(taskDispatch, "dispatch", 512, NULL, 2, &hDisp);
 #if METRICS_ENABLED

@@ -81,18 +81,19 @@ CubeHUD::CubeHUD(TFT_FSMC& tft, CubeView& cube, CubeState& state, CubeSolver& so
 	_sol[0] = 0;
 }
 
-void CubeHUD::begin(SemaphoreHandle_t tftMutex) {
-	_mtx = tftMutex;
+void CubeHUD::begin() {
 	_cube.setOrigin(0, 0);  // cubo no canto esquerdo; o painel ocupa x >= 200
-	_needStatic = true;     // a UI desenha o fundo na primeira passada (já com o mutex)
+	_needStatic = true;
 }
 
-void CubeHUD::uiTask(void* hud) {
-	CubeHUD* h = (CubeHUD*)hud;
-	for (;;) {
-		h->updateUI();
-		vTaskDelay(pdMS_TO_TICKS(25));
-	}
+void CubeHUD::invalidate() {
+	memset(_tc, 0, sizeof(_tc));  // caches de texto
+	_lastBadge = (State)255;
+	_lastLocked = false;
+	_lastProg = false;
+	_lastDone = -2;  // força redesenho da lista
+	_barFx = _barFw = -1;
+	_needStatic = true;
 }
 
 void CubeHUD::solveTask(void* hud) {

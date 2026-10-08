@@ -44,21 +44,8 @@ void InputManager::poll() {
 	if (clk != _lastClk && clk == LOW) post(IN_ENC_ROT, digitalRead(ENCODER_DT) ? 1 : -1);
 	_lastClk = clk;
 
-	// botão do encoder: clique curto ao soltar, ou longo assim que passa de LONG_MS
-	int8_t e = update(_enc);
-	if (e > 0) {
-		_enc.t0 = now;
-		_enc.longSent = false;
-	} else if (e < 0 && !_enc.longSent) {
-		post(IN_ENC_CLICK);
-	}
-	if (_enc.state && !_enc.longSent && now - _enc.t0 >= LONG_MS) {
-		_enc.longSent = true;
-		post(IN_ENC_LONG);
-	}
-
-	// K0 / K1
-	if (update(_k0) > 0) post(IN_K0);
+	pressEvents(_enc, IN_ENC_CLICK, IN_ENC_LONG, now);
+	pressEvents(_k0, IN_K0, IN_K0_LONG, now);
 	if (update(_k1) > 0) post(IN_K1);
 
 	// touch: a cada 20 ms; só aceita novo toque após 100 ms solto
@@ -71,6 +58,21 @@ void InputManager::poll() {
 		} else if (_touchRel < 255) {
 			_touchRel++;
 		}
+	}
+}
+
+// curto = ao soltar; longo = assim que passa de LONG_MS (e então o soltar não gera clique)
+void InputManager::pressEvents(Btn& b, uint8_t shortT, uint8_t longT, uint32_t now) {
+	int8_t e = update(b);
+	if (e > 0) {
+		b.t0 = now;
+		b.longSent = false;
+	} else if (e < 0 && !b.longSent) {
+		post(shortT);
+	}
+	if (b.state && !b.longSent && now - b.t0 >= LONG_MS) {
+		b.longSent = true;
+		post(longT);
 	}
 }
 

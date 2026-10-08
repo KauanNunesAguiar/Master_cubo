@@ -34,15 +34,15 @@ class CubeHUD {
 	uint8_t scrambleLen = 20;  // tamanho do embaralhamento (máx. 30)
 
 	/* Chamar depois de tft.begin() e cube.begin(). Posiciona o cubo à esquerda (setOrigin). */
-	void begin(SemaphoreHandle_t tftMutex);
+	void begin();
 
 	/* --- Tarefas FreeRTOS: passe o ponteiro do HUD como parâmetro --- */
-	static void uiTask(void* hud);     // toque + estado + desenho (prioridade 2, pilha 1024 words)
 	static void solveTask(void* hud);  // procura a solução (prioridade 1, pilha 1536 words)
 
 	/* ...ou, se preferir, chame você mesmo em loop: */
-	void updateUI();   // a cada ~25 ms
-	void solveStep();  // a cada ~20 ms
+	void updateUI();    // a cada ~25 ms
+	void solveStep();   // a cada ~20 ms
+	void invalidate();  // força redesenho completo (ao voltar para esta tela)
 
 	/* --- Ações (podem ser chamadas de qualquer tarefa) --- */
 	void requestSolve();                // K1 / botão RESOLVE: o cronômetro conta a partir daqui
@@ -66,7 +66,6 @@ class CubeHUD {
 	CubeView& _cube;
 	CubeState& _cs;
 	CubeSolver& _solver;
-	SemaphoreHandle_t _mtx = nullptr;
 
 	/* estado compartilhado entre tarefas */
 	volatile State _st = ST_IDLE;
@@ -101,8 +100,8 @@ class CubeHUD {
 	const char* statusText(uint32_t now) const;
 	uint8_t stickersOk() const;
 
-	void lock() { xSemaphoreTake(_mtx, portMAX_DELAY); }
-	void unlock() { xSemaphoreGive(_mtx); }
+	void lock() {}
+	void unlock() {}
 	void text(uint8_t slot, int16_t x, int16_t y, uint8_t size, uint16_t fg, const char* s, uint8_t width);
 	void drawStatic();
 	void drawButtons(bool enabled);

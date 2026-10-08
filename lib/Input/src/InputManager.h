@@ -19,6 +19,7 @@ enum InputType : uint8_t {
 	IN_ENC_CLICK,  // clique curto (dispara ao soltar)
 	IN_ENC_LONG,   // segurou ~0,7 s (dispara uma vez, sem esperar soltar)
 	IN_K0,         // K0 pressionado
+	IN_K0_LONG,    // K0 segurado ~0,7 s
 	IN_K1,         // K1 pressionado
 	IN_TOUCH       // a = x, b = y (só na borda de subida)
 };
@@ -59,4 +60,5 @@ class InputManager {
 
 	void post(uint8_t type, int16_t a = 0, int16_t b = 0);
 	int8_t update(Btn& b);  // +1 apertou, -1 soltou, 0 nada
+	void pressEvents(Btn& b, uint8_t shortT, uint8_t longT, uint32_t now);
 };
