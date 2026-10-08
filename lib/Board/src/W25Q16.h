@@ -12,12 +12,18 @@ class W25Q16 {
 	bool begin();       // true se o ID for EF 40 15
 	uint32_t readId();  // 0xEF4015
 	void read(uint32_t addr, uint8_t* buf, uint32_t len);
-	bool eraseSector(uint32_t addr);                               // apaga 4 KB (addr alinhado); bloqueia até terminar
+	uint8_t read8(uint32_t addr);     // leitura de 1 byte pelos registradores do SPI (rápida)
+	bool eraseSector(uint32_t addr);  // apaga 4 KB (addr alinhado); bloqueia até terminar
 	void write(uint32_t addr, const uint8_t* data, uint32_t len);  // o trecho precisa estar apagado
 
    private:
 	SPIClass _spi;
 	uint32_t _cs;
+
+	bool _fast = false;
+	SPI_TypeDef* _spiReg = nullptr;
+	GPIO_TypeDef* _csPort = nullptr;
+	uint32_t _csMask = 0;
 	void select();
 	void deselect();
 	void writeEnable();

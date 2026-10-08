@@ -224,6 +224,7 @@ void setup() {
 
 	tft.fillScreen(TFT_BLACK);
 	if (!cube.begin()) { Serial.println("Sem RAM para o canvas do cubo"); }
+	cube.setAnimation(true, 150);
 
 	pinMode(BTN_K0, INPUT_PULLUP);
 	pinMode(BTN_K1, INPUT_PULLUP);

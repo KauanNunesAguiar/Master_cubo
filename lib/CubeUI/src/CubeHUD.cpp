@@ -223,7 +223,7 @@ void CubeHUD::solveStep() {
 
 	CubeState snap = _cs;
 	uint32_t t0 = millis();
-	int len = _solver.solve(snap, _sol, sizeof(_sol));
+	int len = _solver.solve(snap, _sol, sizeof(_sol), 26, 60000, 1500);
 	_lastSearchMs = millis() - t0;
 	_lastNodes = _solver.nodes();
 	metricsPrintSolve(Serial);

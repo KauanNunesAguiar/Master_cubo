@@ -5,13 +5,62 @@ static const uint32_t SPI_HZ = 42000000;
 
 W25Q16::W25Q16(uint32_t cs, uint32_t mosi, uint32_t miso, uint32_t sck) : _spi(mosi, miso, sck), _cs(cs) {}
 
+static inline uint8_t spiXfer(SPI_TypeDef* s, uint8_t v) {
+	while (!(s->SR & SPI_SR_TXE)) {}
+	*(volatile uint8_t*)&s->DR = v;
+	while (!(s->SR & SPI_SR_RXNE)) {}
+	return *(volatile uint8_t*)&s->DR;
+}
+
 bool W25Q16::begin() {
 	pinMode(_cs, OUTPUT);
 	digitalWrite(_cs, HIGH);
 	_spi.begin();
-	return readId() == 0xEF4015;
+	_spi.beginTransaction(SPISettings(SPI_HZ, MSBFIRST, SPI_MODE0));  // configura o periférico
+	_spi.endTransaction();
+
+	bool ok = readId() == 0xEF4015;
+	_fast = false;
+
+	PinName pn = digitalPinToPinName(_cs);
+	_csPort = get_GPIO_Port(STM_PORT(pn));
+	_csMask = 1u << STM_PIN(pn);
+
+	// PB3/PB4/PB5 podem ser SPI1 ou SPI3: escolhe o que está ligado e confere com o caminho lento
+	if (ok) {
+		SPI_TypeDef* cands[2] = {SPI1, SPI3};
+		const uint32_t test[5] = {0, 1, 0x1234, 0x85000, 0x101001};
+		for (SPI_TypeDef* c : cands) {
+			if (!(c->CR1 & SPI_CR1_SPE)) continue;
+			_spiReg = c;
+			_fast = true;
+			for (uint32_t a : test) {
+				uint8_t slow;
+				read(a, &slow, 1);
+				if (read8(a) != slow) _fast = false;
+			}
+			if (_fast) break;
+		}
+	}
+	return ok;
 }
 
+uint8_t W25Q16::read8(uint32_t addr) {
+	if (!_fast || !(_spiReg->CR1 & SPI_CR1_SPE)) {  // fallback seguro
+		uint8_t b;
+		read(addr, &b, 1);
+		return b;
+	}
+	SPI_TypeDef* s = _spiReg;
+	_csPort->BSRR = (uint32_t)_csMask << 16;  // CS baixo
+	spiXfer(s, 0x03);
+	spiXfer(s, (addr >> 16) & 0xFF);
+	spiXfer(s, (addr >> 8) & 0xFF);
+	spiXfer(s, addr & 0xFF);
+	uint8_t b = spiXfer(s, 0);
+	_csPort->BSRR = _csMask;  // CS alto
+	return b;
+}
 void W25Q16::select() {
 	_spi.beginTransaction(SPISettings(SPI_HZ, MSBFIRST, SPI_MODE0));
 	digitalWrite(_cs, LOW);

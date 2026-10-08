@@ -2,6 +2,7 @@
 #include "CubeSolver.h"
 
 #include <Arduino.h>
+#include <string.h>
 
 #include "Metrics.h"
 
@@ -36,26 +37,32 @@ bool CubeSolver::search1(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 	if (tick()) return false;
 	M_INC(solver.nodes1);
 	const CubieCube& c = _cc[depth];
-	uint16_t tw = getTwist(c), fl = getFlip(c), sl = getSlice(c);
 
 	if (remaining == 0) {
-		if ((tw | fl | sl) != 0) return false;
+		if (c.ep[8] < 8 || c.ep[9] < 8 || c.ep[10] < 8 || c.ep[11] < 8) return false;
+		for (uint8_t i = 0; i < 7; i++)
+			if (c.co[i]) return false;
+		for (uint8_t i = 0; i < 11; i++)
+			if (c.eo[i]) return false;
 		if (depth) {
-			// Se o último giro da fase 1 já é um giro da fase 2 (U, D ou meia-volta),
-			// o cubo já estava em G1 um passo antes: essa solução já foi tentada com menos giros.
 			uint8_t last = _sol[depth - 1];
 			if (last / 3 == FACE_U || last / 3 == FACE_D || last % 3 == 1) return false;
 		}
+		for (uint8_t i = 0; i < depth; i++) {  // a fase 1 não mantém cp: refaz a cadeia completa
+			_cc[i + 1] = _cc[i];
+			_cc[i + 1].multiply(moveCubie(_sol[i]));
+		}
 		return phase2(depth, lastFace);
 	}
+
+	uint16_t tw = getTwist(c), sl = getSlice(c);
 	if (_ts.get((uint32_t)tw * N_SLICE + sl) > remaining) return false;
-	if (_fs.get((uint32_t)fl * N_SLICE + sl) > remaining) return false;
+	if (_fs.get((uint32_t)getFlip(c) * N_SLICE + sl) > remaining) return false;
 
 	for (uint8_t m = 0; m < N_MOVES; m++) {
 		int8_t face = m / 3;
 		if (!allowed(face, lastFace)) continue;
-		_cc[depth + 1] = c;
-		_cc[depth + 1].multiply(moveCubie(m));
+		_cc[depth + 1].multiplyP1(c, moveCubie(m));
 		_sol[depth] = m;
 		if (search1(depth + 1, remaining - 1, face)) return true;
 		if (_abort) return false;
@@ -114,53 +121,73 @@ bool CubeSolver::search2(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 	}
 	return false;
 }
-
-int CubeSolver::solve(const CubeState& s, char* out, size_t outLen, uint8_t maxDepth, uint32_t timeoutMs) {
-	if (outLen == 0) return -4;
-	if (!_cc[0].fromFacelets(s) || _cc[0].verify() != 0) return -1;
-
-	_maxDepth = maxDepth > 30 ? 30 : maxDepth;
-	_nodes = 0;
-	_abort = false;
-	_t0 = millis();
-	_timeout = timeoutMs;
-	metricsResetSolve();
-
-	// registra o resultado nas métricas (vazio se METRICS_ENABLED=0)
-	auto done = [&](int rc) -> int {
-		M_SET(solver.totalMs, millis() - _t0);
-		M_SET(solver.result, rc);
-		M_SET(solver.solLen, rc >= 0 ? _len : 0);
-		return rc;
-	};
-
-	/* Escalonado: primeiro muitas soluções de fase 1 com fase 2 curta (barata);
-	 * só relaxa o limite da fase 2 se nada for encontrado. */
+// Procura a primeira solução com no máximo maxDepth giros (escalonada, como antes).
+bool CubeSolver::runStages(uint8_t maxDepth, uint8_t stFrom) {
 	static const uint8_t CAP[4] = {10, 12, 14, 18};
-	bool found = false;
-	for (uint8_t st = 0; st < 4 && !found; st++) {
+	_maxDepth = maxDepth;
+	for (uint8_t st = stFrom; st < 4; st++) {
 		_p2Max = CAP[st];
 		M_SET(solver.stage, st);
 		uint8_t lim1 = (st < 3 && _maxDepth > 12) ? 12 : _maxDepth;
-		for (uint8_t d1 = 0; d1 <= lim1 && !found; d1++) {
-			found = search1(0, d1, -1);
-			if (_abort) return done(-2);
+		for (uint8_t d1 = 0; d1 <= lim1; d1++) {
+			if (search1(0, d1, -1)) return true;
+			if (_abort) return false;
 		}
 	}
-	if (!found) return done(-3);
+	return false;
+}
+
+int CubeSolver::solve(const CubeState& s, char* out, size_t outLen, uint8_t maxDepth, uint32_t timeoutMs,
+                      uint32_t refineMs) {
+	if (outLen == 0) return -4;
+	if (!_cc[0].fromFacelets(s) || _cc[0].verify() != 0) return -1;
+
+	if (maxDepth > 30) maxDepth = 30;
+	_nodes = 0;
+	_abort = false;
+	const uint32_t tStart = millis();
+	_t0 = tStart;
+	_timeout = timeoutMs;
+	metricsResetSolve();
+
+	auto done = [&](int rc) -> int {
+		M_SET(solver.totalMs, millis() - tStart);
+		M_SET(solver.result, rc);
+		M_SET(solver.solLen, rc >= 0 ? rc : 0);
+		return rc;
+	};
+
+	// 1) primeira solução
+	if (!runStages(maxDepth, refineMs ? 2 : 0)) return done(_abort ? -2 : -3);
+	uint8_t bestLen = _len;
+	memcpy(_best, _sol, bestLen);
+#if METRICS_ENABLED
+	Serial.printf("[M] 1a solucao: %u giros em %lu ms\n", (unsigned)bestLen, (unsigned long)(millis() - tStart));
+#endif
+
+	// 2) refinamento (opcional)
+	if (refineMs) {
+		_t0 = millis();
+		_timeout = refineMs;
+		_abort = false;
+		while (bestLen > 1 && runStages(bestLen - 1, 0)) {
+			bestLen = _len;
+			memcpy(_best, _sol, bestLen);
+		}
+	}
 
 	size_t p = 0;
-	for (uint8_t i = 0; i < _len; i++) {
+	for (uint8_t i = 0; i < bestLen; i++) {
 		if (p + 4 > outLen) return done(-4);
-		out[p++] = "URFDLB"[_sol[i] / 3];
-		uint8_t t = _sol[i] % 3;  // 0 = horário, 1 = 180°, 2 = anti-horário
+		out[p++] = "URFDLB"[_best[i] / 3];
+		uint8_t t = _best[i] % 3;
 		if (t == 1)
 			out[p++] = '2';
 		else if (t == 2)
 			out[p++] = '\'';
 		out[p++] = ' ';
 	}
-	if (p) p--;  // tira o espaço final
+	if (p) p--;
 	out[p] = '\0';
-	return done(_len);
+	return done(bestLen);
 }
