@@ -10,6 +10,7 @@ CubeSolver::CubeSolver(W25Q16& flash)
       _us{&flash, PRUNE_ADDR_UDPERM_SP},
       _len(0),
       _maxDepth(30),
+      _p2Max(30),
       _nodes(0),
       _t0(0),
       _timeout(0),
@@ -34,7 +35,16 @@ bool CubeSolver::search1(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 	const CubieCube& c = _cc[depth];
 	uint16_t tw = getTwist(c), fl = getFlip(c), sl = getSlice(c);
 
-	if (remaining == 0) return (tw | fl | sl) == 0 && phase2(depth, lastFace);
+	if (remaining == 0) {
+		if ((tw | fl | sl) != 0) return false;
+		if (depth) {
+			// Se o último giro da fase 1 já é um giro da fase 2 (U, D ou meia-volta),
+			// o cubo já estava em G1 um passo antes: essa solução já foi tentada com menos giros.
+			uint8_t last = _sol[depth - 1];
+			if (last / 3 == FACE_U || last / 3 == FACE_D || last % 3 == 1) return false;
+		}
+		return phase2(depth, lastFace);
+	}
 	if (_ts.get((uint32_t)tw * N_SLICE + sl) > remaining) return false;
 	if (_fs.get((uint32_t)fl * N_SLICE + sl) > remaining) return false;
 
@@ -56,7 +66,7 @@ bool CubeSolver::phase2(uint8_t depth, int8_t lastFace) {
 	uint8_t h1 = _cs.get((uint32_t)getCPerm(c) * N_SLICE_PERM + sp);
 	uint8_t h2 = _us.get((uint32_t)getUDPerm(c) * N_SLICE_PERM + sp);
 	uint8_t h = h1 > h2 ? h1 : h2;
-	for (uint8_t lim = h; depth + lim <= _maxDepth; lim++) {
+	for (uint8_t lim = h; lim <= _p2Max && depth + lim <= _maxDepth; lim++) {
 		if (search2(depth, lim, lastFace)) return true;
 		if (_abort) return false;
 	}
@@ -100,10 +110,17 @@ int CubeSolver::solve(const CubeState& s, char* out, size_t outLen, uint8_t maxD
 	_t0 = millis();
 	_timeout = timeoutMs;
 
+	/* Escalonado: primeiro muitas soluções de fase 1 com fase 2 curta (barata);
+	 * só relaxa o limite da fase 2 se nada for encontrado. */
+	static const uint8_t CAP[4] = {10, 12, 14, 18};
 	bool found = false;
-	for (uint8_t d1 = 0; d1 <= _maxDepth && !found; d1++) {
-		found = search1(0, d1, -1);
-		if (_abort) return -2;
+	for (uint8_t st = 0; st < 4 && !found; st++) {
+		_p2Max = CAP[st];
+		uint8_t lim1 = (st < 3 && _maxDepth > 12) ? 12 : _maxDepth;
+		for (uint8_t d1 = 0; d1 <= lim1 && !found; d1++) {
+			found = search1(0, d1, -1);
+			if (_abort) return -2;
+		}
 	}
 	if (!found) return -3;
 

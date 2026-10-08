@@ -21,7 +21,7 @@
 #define ENCODER_SW PA7
 
 /* Autotestes no boot (poda + solver). Ponha 1 para ligar. */
-#define RUN_SELFTESTS 0
+#define RUN_SELFTESTS 1
 
 TouchXPT2046 touch;
 TFT_FSMC tft;
@@ -162,9 +162,9 @@ void taskEncoder(void*) {
 		bool currentClk = digitalRead(ENCODER_CLK);
 		if (currentClk != lastClkState && currentClk == LOW) {
 			if (digitalRead(ENCODER_DT))
-				cube.rotate(0, 8.0f);
+				cube.rotate(0, 15.0f);
 			else
-				cube.rotate(0, -8.0f);
+				cube.rotate(0, -15.0f);
 		}
 		lastClkState = currentClk;
 
@@ -187,6 +187,8 @@ void taskLed(void*) {
 void setup() {
 	Serial.begin(115200);
 	pinMode(LED_D2, OUTPUT);
+
+	Serial.printf("SYSCLK: %lu Hz\n", (unsigned long)SystemCoreClock);
 
 	CubeState::init();  // tabelas de permutação (uma vez, antes das tasks)
 	solver.begin();     // gera os giros em nível de peça

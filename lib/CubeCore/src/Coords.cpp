@@ -3,8 +3,13 @@
 
 const uint8_t P2_MOVES[N_MOVES_P2] = {0, 1, 2, 4, 7, 9, 10, 11, 13, 16};  // U U2 U' R2 F2 D D2 D' L2 B2
 static CubieCube g_m18[N_MOVES];
+static uint16_t g_cnk[13][5];  // g_cnk[n][k] = C(n,k), preenchida em coordsInit()
 
 void coordsInit() {
+	for (uint8_t n = 0; n < 13; n++)
+		for (uint8_t k = 0; k < 5; k++)
+			g_cnk[n][k] = (k == 0) ? 1 : (n == 0) ? 0 : g_cnk[n - 1][k - 1] + g_cnk[n - 1][k];
+
 	CubieCube::initMoves();
 	for (uint8_t f = 0; f < 6; f++) {
 		g_m18[f * 3] = CubieCube::move(f);
@@ -47,12 +52,7 @@ void setFlip(CubieCube& c, uint16_t f) {
 }
 
 /* ---- slice: sistema de numeração combinatória (qual subconjunto de 4 posições entre 12) ---- */
-static uint16_t cnk(uint8_t n, uint8_t k) {
-	if (k > n) return 0;
-	uint32_t r = 1;
-	for (uint8_t i = 1; i <= k; i++) r = r * (n - k + i) / i;
-	return (uint16_t)r;
-}
+static inline uint16_t cnk(uint8_t n, uint8_t k) { return (k > n) ? 0 : g_cnk[n][k]; }
 uint16_t getSlice(const CubieCube& c) {
 	uint16_t a = 0;
 	uint8_t x = 0;

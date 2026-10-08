@@ -1,7 +1,7 @@
 // W25Q16.cpp
 #include "W25Q16.h"
 
-static const uint32_t SPI_HZ = 10000000;  // conservador; dá para subir depois de medir
+static const uint32_t SPI_HZ = 42000000;
 
 W25Q16::W25Q16(uint32_t cs, uint32_t mosi, uint32_t miso, uint32_t sck) : _spi(mosi, miso, sck), _cs(cs) {}
 
