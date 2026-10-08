@@ -9,7 +9,7 @@ void TouchXPT2046::begin(int16_t w, int16_t h) {
 	_h = h;
 	pinMode(_cs, OUTPUT);
 	digitalWrite(_cs, HIGH);
-	pinMode(_pen, INPUT_PULLUP);
+	pinMode(_pen, INPUT_PULLUP);  // não é usado para detectar toque (instável logo após a conversão)
 	_spi.begin();
 }
 
@@ -33,26 +33,56 @@ uint16_t TouchXPT2046::readChannel(uint8_t cmd) {
 	return (((hi << 8) | lo) >> 3) & 0x0FFF;
 }
 
-bool TouchXPT2046::read(int16_t& x, int16_t& y) {
-	if (digitalRead(_pen) != LOW) return false;
+static uint16_t median5(uint16_t* v) {
+	for (uint8_t i = 1; i < 5; i++) {
+		uint16_t k = v[i];
+		int8_t j = (int8_t)i - 1;
+		while (j >= 0 && v[j] > k) {
+			v[j + 1] = v[j];
+			j--;
+		}
+		v[j + 1] = k;
+	}
+	return v[2];
+}
 
-	const int N = 8;
-	uint32_t sx = 0, sy = 0;
+bool TouchXPT2046::readRaw(uint16_t& rx, uint16_t& ry) {
+	uint16_t xs[5], ys[5];
+
 	_spi.beginTransaction(SPISettings(2000000, MSBFIRST, SPI_MODE0));
-	readChannel(0xD0);  // leitura descartada
-	for (int i = 0; i < N; i++) {
-		sx += readChannel(0xD0);
-		sy += readChannel(0x90);
+	uint16_t z1 = readChannel(0xB0);  // Z1
+	uint16_t z2 = readChannel(0xC0);  // Z2
+	int32_t z = (int32_t)z1 + 4095 - (int32_t)z2;
+	pressure = z > 0 ? (uint16_t)z : 0;
+	bool touched = z >= (int32_t)minPressure;
+	if (touched) {
+		readChannel(0xD0);  // leituras descartadas (tempo de assentamento)
+		readChannel(0x90);
+		for (uint8_t i = 0; i < 5; i++) {
+			xs[i] = readChannel(0xD0);
+			ys[i] = readChannel(0x90);
+		}
 	}
 	_spi.endTransaction();
 
-	if (digitalRead(_pen) != LOW) return false;
+	if (!touched) return false;
 
-	rawX = sx / N;
-	rawY = sy / N;
+	uint16_t mx = median5(xs), my = median5(ys);
+	if (mx == 0 || mx >= 4095 || my == 0 || my >= 4095) return false;  // leitura inválida
+	rx = mx;
+	ry = my;
+	return true;
+}
 
-	int32_t rx = rawX, ry = rawY;
+bool TouchXPT2046::read(int16_t& x, int16_t& y) {
+	uint16_t rx16, ry16;
+	if (!readRaw(rx16, ry16)) return false;
+	rawX = rx16;
+	rawY = ry16;
+
+	int32_t rx = rx16, ry = ry16;
 	int32_t xMin = _xMin, xMax = _xMax, yMin = _yMin, yMax = _yMax;
+	if (xMax <= xMin || yMax <= yMin) return false;
 	if (_swap) {
 		int32_t t = rx;
 		rx = ry;

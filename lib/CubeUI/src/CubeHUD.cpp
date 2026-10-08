@@ -31,7 +31,7 @@ const int16_t PX = 200, PW = 120;  // painel
 const int16_t IX = 208, IW = 108;  // área útil do painel
 const int16_t BADGE_Y = 4, TIMER_Y = 32, BAR_Y = 60, LINE_Y = 72, BIG_Y = 86, LABEL_Y = 122, LIST_Y = 134, CELL_W = 18,
               CELL_H = 11, STATS_Y = 195;
-const int16_t BTN_Y = 204, BTN_H = 32, BTN_W = 92, BTN1_X = 6, BTN2_X = 102;
+const int16_t BTN_Y = 204, BTN_H = 32, BTN_W = 98, BTN1_X = 1, BTN2_X = 101;
 
 void fmtTime(char* out, size_t n, uint32_t ms) {  // m:ss.d
 	if (ms > 599900) ms = 599900;
@@ -277,7 +277,7 @@ void CubeHUD::drawButtons(bool en) {
 		const char* label;
 		uint16_t color;
 	};
-	const Btn btns[2] = {{BTN1_X, "MISTURA", C_BLU}, {BTN2_X, "RESOLVE", C_GRN}};
+	const Btn btns[2] = {{BTN1_X, "SCRAMBLE", C_BLU}, {BTN2_X, "SOLVE", C_GRN}};
 	lock();
 	for (const Btn& b : btns) {
 		_tft.fillRoundRect(b.x, BTN_Y, BTN_W, BTN_H, 7, en ? b.color : C_TRACK);

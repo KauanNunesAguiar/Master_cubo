@@ -10,9 +10,12 @@ class TouchXPT2046 {
 	void begin(int16_t w, int16_t h);
 	void setCalibration(uint16_t xMin, uint16_t xMax, uint16_t yMin, uint16_t yMax, bool swapXY = false,
 	                    bool invX = false, bool invY = false);
-	bool read(int16_t& x, int16_t& y);  // true se houver toque
+	bool readRaw(uint16_t& rx, uint16_t& ry);  // true se houver toque; valores brutos 0..4095
+	bool read(int16_t& x, int16_t& y);         // true se houver toque; coordenadas da tela
 
 	uint16_t rawX = 0, rawY = 0;  // últimos valores brutos (para calibrar)
+	uint16_t pressure = 0;        // última pressão medida
+	uint16_t minPressure = 400;   // abaixo disso = sem toque (diminua se o toque leve falhar)
 
    private:
 	SPIClass _spi;

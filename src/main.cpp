@@ -20,16 +20,6 @@
 #define ENCODER_DT PA5
 #define ENCODER_SW PA7
 
-/* ================================================================= *
- * 2. BOTÕES DE SELEÇÃO DE FACES (U, R, F, D, L, B)                 *
- * ================================================================= */
-#define BTN_FACE_U PC3  // Branco
-#define BTN_FACE_R PA3  // Vermelho
-#define BTN_FACE_F PC1  // Verde
-#define BTN_FACE_D PA2  // Amarelo
-#define BTN_FACE_L PC0  // Laranja
-#define BTN_FACE_B PC2  // Azul
-
 /* Autotestes no boot (poda + solver). Ponha 1 para ligar. */
 #define RUN_SELFTESTS 0
 
@@ -82,6 +72,73 @@ static void selfTests() {
 }
 #endif
 
+// ---- Calibração do touch (segure K0 ao ligar) ----
+static void drawTarget(int16_t x, int16_t y) {
+	tft.fillScreen(TFT_BLACK);
+	tft.setTextSize(2);
+	tft.setTextColor(TFT_WHITE);
+	tft.setCursor(82, 110);
+	tft.print("Toque no alvo");
+	tft.drawCircle(x, y, 10, TFT_RED);
+	tft.drawFastHLine(x - 14, y, 29, TFT_RED);
+	tft.drawFastVLine(x, y - 14, 29, TFT_RED);
+}
+
+static void waitTouchRaw(uint16_t& rx, uint16_t& ry) {
+	uint16_t x = 0, y = 0;
+	while (!touch.readRaw(x, y)) delay(10);
+	delay(150);  // deixa o dedo assentar
+	uint32_t sx = 0, sy = 0;
+	uint8_t n = 0;
+	for (uint8_t i = 0; i < 10; i++) {
+		if (touch.readRaw(x, y)) {
+			sx += x;
+			sy += y;
+			n++;
+		}
+		delay(10);
+	}
+	rx = n ? sx / n : x;
+	ry = n ? sy / n : y;
+	uint8_t freeCnt = 0;  // espera soltar (200 ms sem toque)
+	while (freeCnt < 20) {
+		freeCnt = touch.readRaw(x, y) ? 0 : freeCnt + 1;
+		delay(10);
+	}
+}
+
+static void calibrateTouch() {
+	const int16_t W = tft.width(), H = tft.height(), M = 20;
+	const int16_t px[3] = {M, (int16_t)(W - 1 - M), (int16_t)(W - 1 - M)};  // topo-esq, topo-dir, baixo-dir
+	const int16_t py[3] = {M, M, (int16_t)(H - 1 - M)};
+	int32_t r[3][2];
+	for (uint8_t i = 0; i < 3; i++) {
+		drawTarget(px[i], py[i]);
+		uint16_t x, y;
+		waitTouchRaw(x, y);
+		r[i][0] = x;
+		r[i][1] = y;
+	}
+
+	// P0->P1 só muda o X da tela; P1->P2 só muda o Y da tela
+	bool swap = abs(r[1][0] - r[0][0]) < abs(r[1][1] - r[0][1]);
+	int sx = swap ? 1 : 0, sy = swap ? 0 : 1;  // canal bruto que vira X / Y da tela
+	int32_t x0 = r[0][sx], x1 = r[1][sx];
+	int32_t y1 = r[1][sy], y2 = r[2][sy];
+	bool invX = x1 < x0, invY = y2 < y1;
+	int32_t xa = x0 < x1 ? x0 : x1, xb = x0 < x1 ? x1 : x0;
+	int32_t ya = y1 < y2 ? y1 : y2, yb = y1 < y2 ? y2 : y1;
+	int32_t ex = (xb - xa) * M / (W - 1 - 2 * M);  // extrapola do alvo até a borda da tela
+	int32_t ey = (yb - ya) * M / (H - 1 - 2 * M);
+	uint16_t xMin = constrain(xa - ex, 0, 4095), xMax = constrain(xb + ex, 0, 4095);
+	uint16_t yMin = constrain(ya - ey, 0, 4095), yMax = constrain(yb + ey, 0, 4095);
+
+	touch.setCalibration(xMin, xMax, yMin, yMax, swap, invX, invY);
+	Serial.printf("touch.setCalibration(%u, %u, %u, %u, %s, %s, %s);\n", xMin, xMax, yMin, yMax,
+	              swap ? "true" : "false", invX ? "true" : "false", invY ? "true" : "false");
+	tft.fillScreen(TFT_BLACK);
+}
+
 void taskRender(void*) {
 	cube.alignCameraToFace(FACE_U);
 
@@ -94,26 +151,6 @@ void taskRender(void*) {
 	}
 }
 
-void taskButtons(void*) {
-	int8_t dir = 1;
-	bool lastWk = false;
-	bool lastK1 = false;
-	for (;;) {
-		bool wk = digitalRead(BTN_WKUP) == HIGH;
-		if (wk && !lastWk) dir = -dir;  // WKUP inverte o sentido
-		lastWk = wk;
-
-		if (digitalRead(BTN_K0) == LOW) cube.rotate(0, 4.0f * dir);  // K0: eixo Y
-
-		bool k1 = digitalRead(BTN_K1) == LOW;  // K1: resolve (só na borda de descida)
-		if (k1 && !lastK1) hud.requestSolve();
-		lastK1 = k1;
-
-		vTaskDelay(pdMS_TO_TICKS(30));
-	}
-}
-
-// Encoder KY-040 por polling: girar = gira a face selecionada, clicar = embaralha
 void taskEncoder(void*) {
 	pinMode(ENCODER_CLK, INPUT_PULLUP);
 	pinMode(ENCODER_DT, INPUT_PULLUP);
@@ -124,7 +161,10 @@ void taskEncoder(void*) {
 	for (;;) {
 		bool currentClk = digitalRead(ENCODER_CLK);
 		if (currentClk != lastClkState && currentClk == LOW) {
-			hud.turnSelected(digitalRead(ENCODER_DT) == HIGH);  // HIGH = horário
+			if (digitalRead(ENCODER_DT))
+				cube.rotate(0, 8.0f);
+			else
+				cube.rotate(0, -8.0f);
 		}
 		lastClkState = currentClk;
 
@@ -134,24 +174,6 @@ void taskEncoder(void*) {
 		}
 
 		vTaskDelay(pdMS_TO_TICKS(2));
-	}
-}
-
-// Tarefa para monitorar os 6 botões de seleção de face
-void taskFaceButtons(void*) {
-	const uint8_t facePins[6] = {BTN_FACE_U, BTN_FACE_R, BTN_FACE_F, BTN_FACE_D, BTN_FACE_L, BTN_FACE_B};
-
-	for (uint8_t i = 0; i < 6; i++) { pinMode(facePins[i], INPUT_PULLUP); }
-
-	for (;;) {
-		for (uint8_t i = 0; i < 6; i++) {
-			if (digitalRead(facePins[i]) == LOW) {
-				hud.selectFace(i);
-				Serial.printf("Face selecionada: %d\n", i);
-				vTaskDelay(pdMS_TO_TICKS(200));  // Debounce
-			}
-		}
-		vTaskDelay(pdMS_TO_TICKS(50));
 	}
 }
 
@@ -186,7 +208,8 @@ void setup() {
 	pinMode(BTN_WKUP, INPUT_PULLDOWN);
 
 	touch.begin(tft.width(), tft.height());
-	touch.setCalibration(200, 3900, 200, 3900, true, false, false);
+	touch.setCalibration(205, 3954, 230, 3870, true, true, true);
+	if (digitalRead(BTN_K0) == LOW) calibrateTouch();  // segure K0 ao ligar
 
 	tftMutex = xSemaphoreCreateMutex();
 
@@ -199,9 +222,7 @@ void setup() {
 	xTaskCreate(CubeHUD::uiTask, "ui", 1024, &hud, 2, NULL);
 	xTaskCreate(CubeHUD::solveTask, "solve", 1536, &hud, 1, NULL);
 	xTaskCreate(taskRender, "render", 2048, NULL, 1, NULL);
-	xTaskCreate(taskButtons, "buttons", 256, NULL, 2, NULL);
 	xTaskCreate(taskEncoder, "encoder", 256, NULL, 3, NULL);
-	xTaskCreate(taskFaceButtons, "facebtns", 256, NULL, 2, NULL);
 
 	vTaskStartScheduler();
 }
