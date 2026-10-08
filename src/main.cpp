@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <STM32FreeRTOS.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "Coords.h"
 #include "CubeSolver.h"
@@ -45,6 +46,8 @@ CubeSolver solver(flash);
 // Estado atual do controle
 uint8_t selectedFace = FACE_F;  // Face padrão inicial (Front)
 volatile int encoderDelta = 0;
+volatile bool solveRequest = false;  // K1 pede, taskSolve atende
+volatile bool solving = false;       // true enquanto o solver roda (bloqueia giros manuais)
 bool lastClkState = HIGH;
 
 #if RUN_SELFTESTS
@@ -107,16 +110,62 @@ void taskRender(void*) {
 	}
 }
 
+void taskSolve(void*) {
+	static char sol[128];  // static para não pesar na pilha da tarefa
+
+	for (;;) {
+		if (solveRequest) {
+			solveRequest = false;
+
+			solving = true;     // a partir daqui o encoder/scramble ficam bloqueados
+			if (cube.busy()) {  // ainda animando: o cubeState ainda não é o estado final
+				solving = false;
+				Serial.println("Cubo ocupado, tente de novo");
+			} else {
+				CubeState snap = cubeState;  // cópia do estado atual
+				Serial.println("Resolvendo...");
+				uint32_t t0 = millis();
+				int len = solver.solve(snap, sol, sizeof(sol));
+				uint32_t dt = millis() - t0;
+				solving = false;
+
+				if (len < 0) {
+					Serial.printf("Solver erro %d (%lu ms)\n", len, (unsigned long)dt);
+				} else if (len == 0) {
+					Serial.println("Cubo ja esta resolvido");
+				} else {
+					// confere se o cubo não mudou durante a busca
+					char a[55], b[55];
+					snap.toString(a);
+					cubeState.toString(b);
+					if (cube.busy() || strcmp(a, b) != 0) {
+						Serial.println("Cubo mudou durante a busca, solucao descartada");
+					} else {
+						Serial.printf("Solucao (%d giros, %lu ms): %s\n", len, (unsigned long)dt, sol);
+						if (!cube.moves(sol)) Serial.println("Falha ao enfileirar a solucao");
+					}
+				}
+			}
+		}
+		vTaskDelay(pdMS_TO_TICKS(50));
+	}
+}
+
 void taskButtons(void*) {
 	int8_t dir = 1;
 	bool lastWk = false;
+	bool lastK1 = false;
 	for (;;) {
 		bool wk = digitalRead(BTN_WKUP) == HIGH;
 		if (wk && !lastWk) dir = -dir;  // WKUP inverte o sentido
 		lastWk = wk;
 
 		if (digitalRead(BTN_K0) == LOW) cube.rotate(0, 4.0f * dir);  // K0: eixo Y
-		if (digitalRead(BTN_K1) == LOW) cube.rotate(4.0f * dir, 0);  // K1: eixo X
+
+		bool k1 = digitalRead(BTN_K1) == LOW;  // K1: resolve (só na borda de descida)
+		if (k1 && !lastK1 && !solving) solveRequest = true;
+		lastK1 = k1;
+
 		vTaskDelay(pdMS_TO_TICKS(30));
 	}
 }
@@ -131,7 +180,7 @@ void taskEncoder(void*) {
 
 	for (;;) {
 		bool currentClk = digitalRead(ENCODER_CLK);
-		if (currentClk != lastClkState && currentClk == LOW) {
+		if (currentClk != lastClkState && currentClk == LOW && !solving) {
 			if (digitalRead(ENCODER_DT) == HIGH) {
 				cube.move(selectedFace, 1);  // Horário
 			} else {
@@ -140,11 +189,12 @@ void taskEncoder(void*) {
 		}
 		lastClkState = currentClk;
 
-		// --- CLIQUE DO BOTÃO DO ENCODER EMBARALHA O CUBO ---
 		if (digitalRead(ENCODER_SW) == LOW) {
-			srand(millis());    // semente depende do momento do clique
-			cube.scramble(20);  // enfileira 20 movimentos aleatórios
-			Serial.println("Cubo embaralhado!");
+			if (!solving) {
+				srand(millis());
+				cube.scramble(20);
+				Serial.println("Cubo embaralhado!");
+			}
 			vTaskDelay(pdMS_TO_TICKS(400));  // Debounce
 		}
 
@@ -207,11 +257,12 @@ void setup() {
 	tftMutex = xSemaphoreCreateMutex();
 
 	xTaskCreate(taskLed, "led", 256, NULL, 1, NULL);
-	xTaskCreate(taskTouch, "touch", 1024, NULL, 2, NULL);
+	xTaskCreate(taskSolve, "solve", 1536, NULL, 1, NULL);
 	xTaskCreate(taskRender, "render", 2048, NULL, 1, NULL);
+	xTaskCreate(taskTouch, "touch", 1024, NULL, 2, NULL);
 	xTaskCreate(taskButtons, "buttons", 256, NULL, 2, NULL);
-	xTaskCreate(taskEncoder, "encoder", 256, NULL, 3, NULL);
 	xTaskCreate(taskFaceButtons, "facebtns", 256, NULL, 2, NULL);
+	xTaskCreate(taskEncoder, "encoder", 256, NULL, 3, NULL);
 
 	vTaskStartScheduler();
 }
