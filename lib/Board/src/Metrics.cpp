@@ -77,12 +77,9 @@ void metricsPrintSolve(Print& out) {
 void metricsPrintRender(Print& out) {
 	const MRender& r = g_metrics.render;
 	uint64_t fr = r.frames ? r.frames : 1;
-	uint64_t lk = r.locks ? r.locks : 1;
 
 	unsigned long rAvg = toUs(r.renderCycles / fr), rMax = toUs(r.renderMax);
 	unsigned long pAvg = toUs(r.pushCycles / fr), pMax = toUs(r.pushMax);
-	unsigned long wAvg = toUs(r.waitCycles / lk), wMax = toUs(r.waitMax);
-	unsigned long hAvg = toUs(r.heldCycles / lk), hMax = toUs(r.heldMax);
 
 	out.printf("[M] render: %lu quadros, %lu fps (ult. janela de 1 s)\n", (unsigned long)r.frames,
 	           (unsigned long)r.fps);
@@ -90,11 +87,6 @@ void metricsPrintRender(Print& out) {
 	    "[M] quadro: total medio %lu.%02lu ms max %lu.%02lu ms | pushColors medio %lu.%02lu ms max %lu.%02lu ms\n",
 	    rAvg / 1000, (rAvg % 1000) / 10, rMax / 1000, (rMax % 1000) / 10, pAvg / 1000, (pAvg % 1000) / 10, pMax / 1000,
 	    (pMax % 1000) / 10);
-	out.printf(
-	    "[M] mutex (taskRender): espera media %lu.%02lu ms max %lu.%02lu ms | segurado medio %lu.%02lu ms max "
-	    "%lu.%02lu ms\n",
-	    wAvg / 1000, (wAvg % 1000) / 10, wMax / 1000, (wMax % 1000) / 10, hAvg / 1000, (hAvg % 1000) / 10, hMax / 1000,
-	    (hMax % 1000) / 10);
 }
 
 #endif

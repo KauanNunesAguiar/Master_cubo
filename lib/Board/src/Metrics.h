@@ -41,8 +41,8 @@ struct MSolver {
 /* --- Render / mutex (zerado por metricsResetRender) --- */
 struct MRender {
 	uint32_t frames, fps, fpsFrames, fpsT0;
-	uint32_t renderMax, pushMax, waitMax, heldMax, locks;
-	uint64_t renderCycles, pushCycles, waitCycles, heldCycles;
+	uint32_t renderMax, pushMax;
+	uint64_t renderCycles, pushCycles;
 };
 
 struct Metrics {
@@ -90,14 +90,7 @@ static inline void metricsRender(uint32_t renderCyc, uint32_t pushCyc) {
 	}
 }
 
-static inline void metricsLock(uint32_t waitCyc, uint32_t heldCyc) {
-	MRender& r = g_metrics.render;
-	r.locks++;
-	r.waitCycles += waitCyc;
-	r.heldCycles += heldCyc;
-	if (waitCyc > r.waitMax) r.waitMax = waitCyc;
-	if (heldCyc > r.heldMax) r.heldMax = heldCyc;
-}
+#define metricsLock(w, h) ((void)0)
 
 /* Atalhos usados no código */
 #define M_TIC(v) uint32_t v = metricsCycles()

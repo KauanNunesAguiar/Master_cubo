@@ -34,10 +34,10 @@ CubeView cube(tft, cubeState);
 CubeSolver solver(flash);
 CubeHUD hud(tft, cube, cubeState, solver);
 
-DebugScreen debugScreen(tft);
+DebugScreen debugScreen(tft, input);
 HudScreen hudScreen(cube, hud);
 
-static TaskHandle_t hDisplay, hSolve, hIn, hDisp;
+static TaskHandle_t hDisplay, hSolve, hIn, hDisp, hLed, hMet;
 
 #if RUN_SELFTESTS
 static void selfTests() {
@@ -253,17 +253,27 @@ void setup() {
 	hud.scrambleLen = 30;  // tamanho do embaralhamento
 	hud.begin();
 	cube.alignCameraToFace(FACE_U);  // era feito no início da taskRender
+
+	// Telas
 	screens.add(&hudScreen);
 	screens.add(&debugScreen);
 
+	debugScreen.addTask("display", &hDisplay, 1024);
+	debugScreen.addTask("solve", &hSolve, 1536);
+	debugScreen.addTask("input", &hIn, 384);
+	debugScreen.addTask("dispatch", &hDisp, 512);
+	debugScreen.addTask("led", &hLed, 256);
+	debugScreen.addTask("metrics", &hMet, 768);
+
 	input.begin();
 
+	xTaskCreate(taskLed, "led", 256, NULL, 1, &hLed);
 	xTaskCreate(ScreenManager::task, "display", 1024, &screens, 1, &hDisplay);
 	xTaskCreate(CubeHUD::solveTask, "solve", 1536, &hud, 1, &hSolve);
 	xTaskCreate(InputManager::task, "input", 384, &input, 3, &hIn);
 	xTaskCreate(taskDispatch, "dispatch", 512, NULL, 2, &hDisp);
 #if METRICS_ENABLED
-	if (xTaskCreate(taskMetrics, "metrics", 768, NULL, 1, NULL) != pdPASS) {
+	if (xTaskCreate(taskMetrics, "metrics", 768, NULL, 1, &hMet) != pdPASS) {
 		Serial.println("Sem heap para taskMetrics");
 	}
 #endif
