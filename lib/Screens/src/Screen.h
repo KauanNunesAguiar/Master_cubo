@@ -44,6 +44,9 @@ class ScreenManager {
 		}
 		_s[_cur]->update(now);
 	}
+	void request(uint8_t idx) {  // troca direta (usada pelas próprias telas); ignora canLeave()
+		if (idx < _n) _want = idx;
+	}
 	static void task(void* self) {
 		ScreenManager* m = (ScreenManager*)self;
 		for (;;) {

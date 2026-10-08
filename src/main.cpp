@@ -16,6 +16,7 @@
 #include "Screen.h"
 #include "TFT_FSMC.h"
 #include "TouchXPT2046.h"
+#include "TreeScreen.h"
 #include "W25Q16.h"
 #include "stm32f4ve_peripherals.h"
 
@@ -26,7 +27,6 @@ TFT_FSMC tft;
 TouchXPT2046 touch;
 InputManager input(&touch);
 
-ScreenManager screens;
 W25Q16 flash;
 
 CubeState cubeState;
@@ -34,8 +34,10 @@ CubeView cube(tft, cubeState);
 CubeSolver solver(flash);
 CubeHUD hud(tft, cube, cubeState, solver);
 
+ScreenManager screens;
 DebugScreen debugScreen(tft, input);
 HudScreen hudScreen(cube, hud);
+TreeScreen treeScreen(tft, hud, screens, 0);
 
 static TaskHandle_t hDisplay, hSolve, hIn, hDisp, hLed, hMet;
 
@@ -257,6 +259,9 @@ void setup() {
 	// Telas
 	screens.add(&hudScreen);
 	screens.add(&debugScreen);
+	screens.add(&treeScreen);
+
+	hudScreen.setAutoTree(&screens, 2);  // 2 = índice da TreeScreen
 
 	debugScreen.addTask("display", &hDisplay, 768);
 	debugScreen.addTask("solve", &hSolve, 768);

@@ -11,12 +11,22 @@ class HudScreen : public Screen {
 	void onEnter() override {
 		_hud.invalidate();
 		_cube.invalidate();
+		_wasSearching = (_hud.state() == CubeHUD::ST_SEARCHING);
 	}
 	void update(uint32_t) override {
 		_cube.update();
 		_hud.updateUI();
+		bool s = (_hud.state() == CubeHUD::ST_SEARCHING);
+		if (s && !_wasSearching && _mgr) _mgr->request(_treeIdx);
+		_wasSearching = s;
 	}
+
 	bool canLeave() override { return !_hud.inputLocked(); }
+
+	void setAutoTree(ScreenManager* m, uint8_t treeIdx) {  // ao iniciar a busca, mostra a árvore ao vivo
+		_mgr = m;
+		_treeIdx = treeIdx;
+	}
 
 	bool onInput(const InputEvent& e) override {
 		switch (e.type) {
@@ -53,6 +63,9 @@ class HudScreen : public Screen {
 	CubeView& _cube;
 	CubeHUD& _hud;
 	Mode _mode = VIEW;
+	ScreenManager* _mgr = nullptr;
+	uint8_t _treeIdx = 0;
+	bool _wasSearching = false;
 
 	void setMode(Mode m) {
 		_mode = m;

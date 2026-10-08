@@ -59,8 +59,14 @@ bool CubeSolver::search1(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 	}
 
 	uint16_t tw = getTwist(c), sl = getSlice(c);
-	if (_ts.get((uint32_t)tw * N_SLICE + sl) > remaining) return false;
-	if (_fs.get((uint32_t)getFlip(c) * N_SLICE + sl) > remaining) return false;
+	if (_ts.get((uint32_t)tw * N_SLICE + sl) > remaining) {
+		S_EVT(EV_P1_PRUNE, depth, 255);
+		return false;
+	}
+	if (_fs.get((uint32_t)getFlip(c) * N_SLICE + sl) > remaining) {
+		S_EVT(EV_P1_PRUNE, depth, 255);
+		return false;
+	}
 
 	for (uint8_t m = 0; m < N_MOVES; m++) {
 		int8_t face = m / 3;
@@ -114,7 +120,11 @@ bool CubeSolver::search2(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 		S_EVT(EV_SOLUTION, depth, 255);
 		return true;
 	}
-	if (h > remaining) return false;
+
+	if (h > remaining) {
+		S_EVT(EV_P2_PRUNE, depth, 255);
+		return false;
+	}
 
 	for (uint8_t k = 0; k < N_MOVES_P2; k++) {
 		uint8_t m = P2_MOVES[k];
@@ -166,8 +176,10 @@ int CubeSolver::solve(const CubeState& s, char* out, size_t outLen, uint8_t maxD
 	_t0 = tStart;
 	_timeout = timeoutMs;
 	metricsResetSolve();
+	S_RESET();
 
 	auto done = [&](int rc) -> int {
+		S_END();
 		M_SET(solver.totalMs, millis() - tStart);
 		M_SET(solver.result, rc);
 		M_SET(solver.solLen, rc >= 0 ? rc : 0);

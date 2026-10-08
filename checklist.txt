@@ -73,7 +73,7 @@ Objetivo: eliminar gargalos de concorrência na interface gráfica.
           pilha display 700/1024 livres; bloqueio de troca durante solve OK
 
 ======================================================================
-ETAPA 5 - Tela de Debug  [QUASE CONCLUÍDA - validar pilhas novas]
+ETAPA 5 - Tela de Debug  [CONCLUÍDA]
 ======================================================================
 Objetivo: central de monitoramento em tempo real.
   [x] DebugScreen completa (atualiza a cada 500 ms, só redesenha linhas que mudaram):
@@ -81,20 +81,33 @@ Objetivo: central de monitoramento em tempo real.
         solver (tempos f1/f2, nós, G1), flash (leituras, média, % do tempo, cache sim),
         pilhas livres/total de todas as tasks, eventos de input perdidos
   [x] Limpeza das métricas de mutex (Metrics.h / Metrics.cpp)
-  [~] Ajustar pilhas (words). Medido em uso: usado = total - livre mínimo
-        display 324 | solve 471 | dispatch 284 | input 78 | led 23 | metrics ? (só mede com WKUP)
-        novos totais: display 768, solve 768, input 192, led 128; dispatch 512 e
-        metrics 768 mantidos. Economia ~5,3 KB de heap. Validar com a tela de debug.
+  [x] Ajustar pilhas (words). Medido em uso: usado = total - livre mínimo
+        display 324 | solve 471 | dispatch 284 | input 78 | led 23 | metrics 276 (492/768 livres, após WKUP)
+        novos totais: display 768, solve 768, input 192, led 128, metrics 512;
+        dispatch 512 mantido. Economia ~5,3 KB de heap. Validar com a tela de debug.
         Heap FreeRTOS: 119488 total, 16348 livre, mín = livre (nenhuma alocação em runtime)
+        VALIDADO (words livres mín.): display 444/768, solve 311/768, dispatch 228/512,
+        input 114/192, led 105/128, metrics 236/512 | heap livre 22716 B (+6,4 KB)
   [x] Dump serial por WKUP: MANTER (útil p/ colar logs e coletar dados do TCC);
         reavaliar na Etapa 7
 
 ======================================================================
-ETAPA 6 - Árvore de Busca (Foco no TCC)  [NÃO INICIADA]
+ETAPA 6 - Árvore de Busca (Foco no TCC)  [QUASE CONCLUÍDA - validar métricas novas]
 ======================================================================
 Objetivo: visualizar o comportamento do algoritmo.
-  [ ] Solver emite eventos para um buffer circular leve
-  [ ] Renderização resumida dos últimos nós ou por profundidade
+  [x] Solver: eventos de nó/poda (EV_P1_PRUNE, EV_P2_PRUNE) + S_RESET/S_END
+  [x] SolverEvents.h/.cpp: g_trace = histograma por profundidade (nós e podas, F1/F2),
+        caminho atual, ring de 64 eventos (16 bits cada). Flag: -D SOLVER_EVENTS=1
+  [x] TreeScreen: gráfico em escala log (nós/podas por profundidade), caminho atual,
+        últimos eventos, ramificação média, % de poda recente, status da busca
+  [x] Automático: SOLVE abre a Árvore ao vivo e volta ao HUD ~1,2 s após a busca
+        (lingerMs soma ao cronômetro do HUD; autoReturn=false desliga)
+  [x] Overhead dos eventos: RESUMO 2671 ms vs 2562 ms (+4,3%), mesmos 22 giros
+  [~] CORREÇÃO: 'ramif' (F1 0.94) era inválida (mistura iterações repetidas).
+        Trocada por: taxa de poda por fase (F1 92%, F2 85% nos dados vistos) e
+        fator de ramificação efetivo da última iteração completa da F1 (N^(1/D))
+  [~] Exportar histograma por profundidade (CSV) pela serial no dump do WKUP
+  Dados de referência (1 busca): F1 158243 nós/146261 podas | F2 344540 nós/294534 podas
 
 ======================================================================
 ETAPA 7 - Reorganização de Libs, Tipos e Bitfields  [NÃO INICIADA]
