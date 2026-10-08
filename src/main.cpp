@@ -8,6 +8,7 @@
 #include "CubeSolver.h"
 #include "CubeState.h"
 #include "CubeView.h"
+#include "InputManager.h"
 #include "Metrics.h"
 #include "PruneTable.h"
 #include "TFT_FSMC.h"
@@ -15,35 +16,21 @@
 #include "W25Q16.h"
 #include "stm32f4ve_peripherals.h"
 
-/* ================================================================= *
- * 1. MÓDULO ENCODER ROTATIVO KY-040                                *
- * ================================================================= */
-#define ENCODER_CLK PA4
-#define ENCODER_DT PA5
-#define ENCODER_SW PA7
-
 /* Autotestes no boot (poda + solver). Ponha 1 para ligar. */
 #define RUN_SELFTESTS 1
 
-TouchXPT2046 touch;
 TFT_FSMC tft;
 SemaphoreHandle_t tftMutex;
+TouchXPT2046 touch;
+InputManager input(&touch);
+W25Q16 flash;
 
 CubeState cubeState;
 CubeView cube(tft, cubeState);
-
-W25Q16 flash;
 CubeSolver solver(flash);
+CubeHUD hud(tft, cube, cubeState, solver);
 
-CubeHUD hud(tft, cube, cubeState, solver, &touch);
-
-Adafruit_NeoPixel m1(8, PC0, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel m2(8, PC1, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel m3_4(16, PC3, NEO_GRB + NEO_KHZ800);
-
-bool lastClkState = HIGH;
-
-static TaskHandle_t hUi, hSolve, hRender, hEnc;
+static TaskHandle_t hUi, hSolve, hRender, hIn, hDisp;  // tarefas: UI, solver, render, input, dispatcher
 
 #if RUN_SELFTESTS
 static void selfTests() {
@@ -184,6 +171,54 @@ static void calibrateTouch() {
 	tft.fillScreen(TFT_BLACK);
 }
 
+enum UiMode : uint8_t { MODE_VIEW, MODE_FACE };
+static UiMode uiMode = MODE_VIEW;
+
+static void setMode(UiMode m) {
+	uiMode = m;
+	if (m == MODE_FACE) {
+		hud.selectFace(hud.face());  // alinha a câmera na face atual
+		hud.notify("Modo: FACE");
+	} else {
+		hud.notify("Modo: VISTA");
+	}
+}
+
+static void handleInput(const InputEvent& e) {
+	switch (e.type) {
+		case IN_ENC_ROT:
+			if (uiMode == MODE_VIEW)
+				cube.rotate(0, e.a > 0 ? 15.0f : -15.0f);
+			else
+				hud.turnSelected(e.a > 0);
+			break;
+		case IN_ENC_CLICK:
+			if (uiMode == MODE_VIEW)
+				hud.scramble();
+			else
+				hud.selectFace((hud.face() + 1) % 6);
+			break;
+		case IN_ENC_LONG:
+			setMode(uiMode == MODE_VIEW ? MODE_FACE : MODE_VIEW);
+			break;
+		case IN_K0:
+			hud.scramble();
+			break;
+		case IN_K1:
+			hud.requestSolve();
+			break;
+		case IN_TOUCH:
+			hud.onTouch(e.a, e.b);
+			break;
+	}
+}
+
+void taskDispatch(void*) {
+	InputEvent e;
+	for (;;)
+		if (input.next(e)) handleInput(e);
+}
+
 #if METRICS_ENABLED
 void taskMetrics(void*) {
 	for (;;) {
@@ -191,9 +226,10 @@ void taskMetrics(void*) {
 			metricsPrintRender(Serial);
 			metricsPrintSolve(Serial);
 			metricsResetRender();  // próxima leitura = nova janela
-			Serial.printf("[M] pilha livre minima (words): ui=%u solve=%u render=%u enc=%u\n",
+			Serial.printf("[M] pilha livre minima (words): ui=%u solve=%u render=%u in=%u disp=%u\n",
 			              (unsigned)uxTaskGetStackHighWaterMark(hUi), (unsigned)uxTaskGetStackHighWaterMark(hSolve),
-			              (unsigned)uxTaskGetStackHighWaterMark(hRender), (unsigned)uxTaskGetStackHighWaterMark(hEnc));
+			              (unsigned)uxTaskGetStackHighWaterMark(hRender), (unsigned)uxTaskGetStackHighWaterMark(hIn),
+			              (unsigned)uxTaskGetStackHighWaterMark(hDisp));
 			vTaskDelay(pdMS_TO_TICKS(500));
 		}
 		vTaskDelay(pdMS_TO_TICKS(50));
@@ -216,58 +252,11 @@ void taskRender(void*) {
 	}
 }
 
-void taskEncoder(void*) {
-	pinMode(ENCODER_CLK, INPUT_PULLUP);
-	pinMode(ENCODER_DT, INPUT_PULLUP);
-	pinMode(ENCODER_SW, INPUT_PULLUP);
-
-	lastClkState = digitalRead(ENCODER_CLK);
-
-	for (;;) {
-		bool currentClk = digitalRead(ENCODER_CLK);
-		if (currentClk != lastClkState && currentClk == LOW) {
-			if (digitalRead(ENCODER_DT))
-				cube.rotate(0, 15.0f);
-			else
-				cube.rotate(0, -15.0f);
-		}
-		lastClkState = currentClk;
-
-		if (digitalRead(ENCODER_SW) == LOW) {
-			hud.scramble();
-			vTaskDelay(pdMS_TO_TICKS(400));  // Debounce
-		}
-
-		vTaskDelay(pdMS_TO_TICKS(2));
-	}
-}
-
 void taskLed(void*) {
-	uint8_t pos = 0;
-	m1.begin();
-	m2.begin();
-	m3_4.begin();
 	pinMode(LED_D2, OUTPUT);
 
 	for (;;) {
 		digitalToggle(LED_D2);
-		m1.setPixelColor(pos % 8, m1.Color(255, 0, 0));
-		m1.setPixelColor((pos - 1) % 8, m1.Color(0, 255, 0));
-		m1.setPixelColor((pos - 2) % 8, m1.Color(0, 0, 255));
-		m1.setPixelColor((pos - 3) % 8, m1.Color(0, 0, 0));
-		m1.show();
-		m2.setPixelColor(pos % 8, m2.Color(255, 0, 0));
-		m2.setPixelColor((pos - 1) % 8, m2.Color(0, 255, 0));
-		m2.setPixelColor((pos - 2) % 8, m2.Color(0, 0, 255));
-		m2.setPixelColor((pos - 3) % 8, m2.Color(0, 0, 0));
-		m2.show();
-		m3_4.setPixelColor(pos % 16, m3_4.Color(0, 0, 255));
-		m3_4.setPixelColor((pos - 1) % 16, m3_4.Color(0, 255, 0));
-		m3_4.setPixelColor((pos - 2) % 16, m3_4.Color(255, 0, 0));
-		m3_4.setPixelColor((pos - 3) % 16, m3_4.Color(0, 0, 0));
-		m3_4.show();
-
-		pos++;
 		vTaskDelay(pdMS_TO_TICKS(250));
 	}
 }
@@ -307,11 +296,13 @@ void setup() {
 	// hud.celebrate = false;     // desliga o giro de comemoração
 	hud.scrambleLen = 30;  // tamanho do embaralhamento
 	hud.begin(tftMutex);
+	input.begin();
 
 	xTaskCreate(CubeHUD::uiTask, "ui", 1024, &hud, 2, &hUi);
 	xTaskCreate(CubeHUD::solveTask, "solve", 1536, &hud, 1, &hSolve);
 	xTaskCreate(taskRender, "render", 2048, NULL, 1, &hRender);
-	xTaskCreate(taskEncoder, "encoder", 512, NULL, 3, &hEnc);
+	xTaskCreate(InputManager::task, "input", 384, &input, 3, &hIn);
+	xTaskCreate(taskDispatch, "dispatch", 512, NULL, 2, &hDisp);
 #if METRICS_ENABLED
 	if (xTaskCreate(taskMetrics, "metrics", 768, NULL, 1, NULL) != pdPASS) {
 		Serial.println("Sem heap para taskMetrics");

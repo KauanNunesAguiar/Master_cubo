@@ -43,14 +43,18 @@ Objetivo: refinamentos lógicos e de desempenho no CubeCore.
   [x] Itens de confiabilidade (ver seção "Confiabilidade")
 
 ======================================================================
-ETAPA 3 - Camada de Input  [NÃO INICIADA]
+ETAPA 3 - Camada de Input  [CONCLUÍDA]
 ======================================================================
 Objetivo: padronizar e desacoplar dispositivos de entrada.
-  [ ] Centralizar touch e encoder em uma camada de eventos dedicada
-      (NOTA: K1 não está ligado a hud.requestSolve() no main.cpp, embora o HUD
-       mostre "K1 = resolver"; resolver na Etapa 3)
-  [ ] Simplificar leitura de pinos
-  [ ] Viabilizar modo manual de seleção de faces e giros
+  [x] InputManager (lib/Input): encoder, K0, K1 e touch viram eventos numa fila
+  [x] Simplificar pinos: debounce único por botão; pinos do encoder em InputManager.h
+  [x] Touch fora do HUD: HUD só recebe onTouch(x,y)
+  [x] K1 -> requestSolve (antes não estava ligado) | K0 -> scramble
+  [x] Modo manual: toque longo no encoder alterna VISTA/FACE
+        VISTA: giro = câmera, clique = embaralhar
+        FACE : giro = gira a face selecionada (horário/anti), clique = próxima face
+  [ ] (adiado p/ Etapa 5) WKUP continua lido direto no taskMetrics
+      Medido (words livres): input=308/384, dispatch=230/512 (ok)
 
 ======================================================================
 ETAPA 4 - Reformulação do Display  [NÃO INICIADA]
@@ -85,7 +89,6 @@ Objetivo: otimização de memória/estruturas (somente no final).
       (sempre medindo o impacto na velocidade)
   [ ] Reorganização de bibliotecas
 
-
 ======================================================================
 DIAGNÓSTICO ATUAL (logs recentes)
 ======================================================================
@@ -118,7 +121,6 @@ CONFIABILIDADE (itens críticos pendentes)
       confirmado: botão do encoder durante "BUSCANDO" não causa nada nem erro
   [ ] (baixa prioridade) _msg/_err lidos pela UI enquanto outra task escreve
   [ ] (baixa prioridade) isSolved()/stickersOk() lidos durante applyMove (só cosmético)
-
 
 ======================================================================
 REGRAS DE TRABALHO

@@ -21,13 +21,12 @@
 #include "CubeState.h"
 #include "CubeView.h"
 #include "TFT_FSMC.h"
-#include "TouchXPT2046.h"
 
 class CubeHUD {
    public:
 	enum State : uint8_t { ST_IDLE, ST_SEARCHING, ST_SOLVING, ST_MANUAL, ST_SOLVED, ST_ERROR };
 
-	CubeHUD(TFT_FSMC& tft, CubeView& cube, CubeState& state, CubeSolver& solver, TouchXPT2046* touch = nullptr);
+	CubeHUD(TFT_FSMC& tft, CubeView& cube, CubeState& state, CubeSolver& solver);
 
 	/* --- Configuração (mude antes de begin()) --- */
 	bool touchButtons = true;  // botões MISTURA / RESOLVE na tela
@@ -51,6 +50,8 @@ class CubeHUD {
 	void selectFace(uint8_t face);      // face do encoder (também alinha a câmera)
 	bool turnSelected(bool clockwise);  // gira a face selecionada (liga o cronômetro manual se armado)
 	bool turn(uint8_t face, uint8_t turns);
+	void onTouch(int16_t x, int16_t y);         // chamado pelo dispatcher (hit-test dos botões na tela)
+	void notify(const char* m) { showMsg(m); }  // mensagem temporária de 2,5 s na linha de status
 
 	/* --- Consulta --- */
 	bool inputLocked() const;  // true durante busca / execução / embaralhamento
@@ -65,7 +66,6 @@ class CubeHUD {
 	CubeView& _cube;
 	CubeState& _cs;
 	CubeSolver& _solver;
-	TouchXPT2046* _touch;
 	SemaphoreHandle_t _mtx = nullptr;
 
 	/* estado compartilhado entre tarefas */
@@ -87,7 +87,7 @@ class CubeHUD {
 	};
 	TxtCache _tc[10];
 	char _tok[32][3];
-	uint8_t _ntok = 0, _kind = 0, _released = 10;
+	uint8_t _ntok = 0, _kind = 0;
 	State _lastBadge = (State)255;
 	bool _lastLocked = false, _lastProg = false, _needStatic = true;
 	uint32_t _lastVer = 0xFFFFFFFF, _idleSince = 0, _spinUntil = 0;

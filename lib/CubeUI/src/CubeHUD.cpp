@@ -74,8 +74,8 @@ const char* verifyErr(int v) {  // máx. 18 caracteres (largura da linha de stat
 
 }  // namespace
 
-CubeHUD::CubeHUD(TFT_FSMC& tft, CubeView& cube, CubeState& state, CubeSolver& solver, TouchXPT2046* touch)
-    : _tft(tft), _cube(cube), _cs(state), _solver(solver), _touch(touch) {
+CubeHUD::CubeHUD(TFT_FSMC& tft, CubeView& cube, CubeState& state, CubeSolver& solver)
+    : _tft(tft), _cube(cube), _cs(state), _solver(solver) {
 	memset(_tc, 0, sizeof(_tc));
 	memset(_tok, 0, sizeof(_tok));
 	_sol[0] = 0;
@@ -215,6 +215,14 @@ void CubeHUD::onManualMove() {
 		_tStart = millis();
 		_st = ST_MANUAL;
 	}
+}
+
+void CubeHUD::onTouch(int16_t tx, int16_t ty) {
+	if (!touchButtons || ty < BTN_Y || ty >= BTN_Y + BTN_H) return;
+	if (tx >= BTN1_X && tx < BTN1_X + BTN_W)
+		scramble();
+	else if (tx >= BTN2_X && tx < BTN2_X + BTN_W)
+		requestSolve();
 }
 
 /* Procura a solução e a enfileira (roda na solveTask: demora de 2 a 15 s). */
@@ -444,22 +452,6 @@ void CubeHUD::updateUI() {
 		drawStatic();
 		drawButtons(true);
 		_needStatic = false;
-	}
-
-	/* --- toque nos botões (só na borda de subida, com 100 ms de "solto" antes) --- */
-	if (touchButtons && _touch) {
-		int16_t tx, ty;
-		if (_touch->read(tx, ty)) {
-			if (_released >= 4 && ty >= BTN_Y && ty < BTN_Y + BTN_H) {
-				if (tx >= BTN1_X && tx < BTN1_X + BTN_W)
-					scramble();
-				else if (tx >= BTN2_X && tx < BTN2_X + BTN_W)
-					requestSolve();
-			}
-			_released = 0;
-		} else if (_released < 255) {
-			_released++;
-		}
 	}
 
 	/* --- fim de animação: o cubo precisa ficar parado por 60 ms (evita falso positivo) --- */
