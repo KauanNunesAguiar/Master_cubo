@@ -4,6 +4,8 @@
 #include <Arduino.h>
 #include <string.h>
 
+#include <new>
+
 #include "Metrics.h"
 #include "SolverEvents.h"
 
@@ -22,7 +24,11 @@ CubeSolver::CubeSolver(W25Q16& flash)
       _p2Used(0),
       _p2Budget(30000),
       _p2Cut(false),
-      _abort(false) {}
+      _abort(false) {
+	static_assert((MAXD + 1) * sizeof(CubieCube) <= 0x800, "_cc invade g_m18");
+	_cc = (CubieCube*)CCM_RAM_BASE;
+	for (uint8_t i = 0; i <= MAXD; i++) new (&_cc[i]) CubieCube();
+}
 
 void CubeSolver::begin() { coordsInit(); }
 

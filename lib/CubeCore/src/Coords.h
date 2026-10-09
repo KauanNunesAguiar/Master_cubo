@@ -7,6 +7,10 @@
 constexpr uint16_t N_TWIST = 2187, N_FLIP = 2048, N_SLICE = 495, N_PERM8 = 40320, N_SLICE_PERM = 24;
 constexpr uint8_t N_MOVES = 18, N_MOVES_P2 = 10;
 
+#ifdef ARDUINO
+#define CCM_RAM_BASE 0x10000000UL  // 64 KB, só CPU (sem DMA)
+#endif
+
 /* Giro m (0..17): face = m / 3, voltas = m % 3 + 1  (U,U2,U',R,R2,R',F,...) */
 extern const uint8_t P2_MOVES[N_MOVES_P2];  // índices dos 10 giros da fase 2
 void coordsInit();                          // chamar uma vez (gera os 18 giros em peças)

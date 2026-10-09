@@ -2,7 +2,14 @@
 #include "Coords.h"
 
 const uint8_t P2_MOVES[N_MOVES_P2] = {0, 1, 2, 4, 7, 9, 10, 11, 13, 16};  // U U2 U' R2 F2 D D2 D' L2 B2
-static CubieCube g_m18[N_MOVES];
+
+#ifdef ARDUINO
+static CubieCube* const g_m18 = (CubieCube*)(CCM_RAM_BASE + 0x800);  // 720 B na CCM
+#else
+static CubieCube g_m18_store[N_MOVES];  // build do PC (tools/gen_tables)
+static CubieCube* const g_m18 = g_m18_store;
+#endif
+
 static uint16_t g_cnk[13][5];  // g_cnk[n][k] = C(n,k), preenchida em coordsInit()
 
 void coordsInit() {

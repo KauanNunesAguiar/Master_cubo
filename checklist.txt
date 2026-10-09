@@ -172,17 +172,23 @@ Objetivo: reduzir tempo médio e cauda de latência do solver, medindo cada pass
 ETAPA 7 - Reorganização de Libs, Tipos e Bitfields  [EM ANDAMENTO]
 ======================================================================
 Dado: sizeof(CubieCube) = 40 (cp8+co8+ep12+eo12); _cc[33]=1320 B, g_m18=720 B
-  [~] 7.1 Medir baseline de RAM/Flash (linha "RAM:/Flash:" do build) e das structs grandes
-      RAM:   [=         ]   8.9% (used 11676 bytes from 131072 bytes)
-      Flash: [=         ]  14.6% (used 76480 bytes from 524288 bytes)
-      sizeof: CubieCube=40 CubeSolver=1460 CubeHUD=788 SolverTrace=704
-  [ ] 7.2 Mapear maiores consumidores de RAM (canvas 80 KB, g_items, SolverTrace, HUD)
-  [ ] 7.3 Experimento A: empacotar CubieCube (~20 B), medir RESUMO do selftest
-        critério: tempo médio <= 2300 ms +2%, mesmos 22 giros; senão, reverter
-  [ ] 7.4 Experimento B: mover _cc/g_m18 para CCM RAM (64 KB livres), medir
-  [ ] 7.5 (opcional) rank de cperm/udperm mais barato (item pendente da seção anterior)
-  [ ] 7.6 Reorganização de libs (Board / CubeCore / CubeUI / Screens / Input)
-  [ ] 7.7 Decidir sobre RUN_SELFTESTS, WKUP e SOLVER_EVENTS no build final
+  [x] 7.1 Baseline de RAM/Flash e structs
+  [x] 7.2 Mapa de RAM: heap FreeRTOS 119488 B (canvas 80000 = 67%, livre 22716 B);
+      .bss ~11,7 KB; CCM 64 KB sem uso. Sem pressão de RAM.
+      Canvas em faixas: descartado (custo de setAddrWindow/re-raster sem necessidade).
+  [x] 7.3 Experimento B: _cc e g_m18 na CCM RAM (0x10000000)  [MANTIDO, neutro]
+      sweep N=200 seed 2024 budget 30000: média 3119 ms (baseline 3113, +0,2%),
+      mediana 2629, p90 5416, máx 8016, giros 21,72, ok 200/200. Dentro do ruído.
+      sizeof(CubeSolver) 1460 -> 144. Flash externa segue em 31% do tempo.
+      Obs.: _cc fixo na CCM => só pode existir 1 CubeSolver por firmware.
+      Nova referência do selftest (seed 12345, budget 30000): ~3100 ms, 5/5, 22 giros
+      (os 2300 ms eram com budget ilimitado).
+  [x] 7.4 Experimento A (empacotar CubieCube): SUSPENSO por análise (economiza ~1 KB,
+      sem cache de dados o acesso custa igual, shift/máscara no caminho quente).
+      Reabrir só se quiser o resultado negativo medido para o TCC.
+  [x] 7.5 Rank mais barato: JÁ TESTADO na Etapa 6B (máscara+popcount, sem ganho) -> encerrado
+  [ ] 7.6 Reorganização de libs
+  [ ] 7.7 Decidir RUN_SELFTESTS, WKUP e SOLVER_EVENTS no build final
 
 ======================================================================
 DIAGNÓSTICO ATUAL (logs recentes)

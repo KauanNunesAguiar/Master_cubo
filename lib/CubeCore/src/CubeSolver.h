@@ -23,8 +23,8 @@ class CubeSolver {
    private:
 	static const uint8_t MAXD = 32;
 	PruneTable _ts, _fs, _cs, _us;
-	CubieCube _cc[MAXD + 1];  // _cc[d] = cubo depois de d giros
-	uint8_t _sol[MAXD];       // giro (0..17) de cada passo
+	CubieCube* _cc;      // MAXD+1 cubos, ficam na CCM RAM
+	uint8_t _sol[MAXD];  // giro (0..17) de cada passo
 	uint8_t _best[MAXD];
 	uint8_t _len, _maxDepth, _p2Max;  // _p2Max = limite de giros da fase 2 no estágio atual
 	int8_t _verr;

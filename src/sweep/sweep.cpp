@@ -14,7 +14,8 @@ static const uint8_t SCRAMBLE = 30;
 static const uint8_t MAX_DEPTH = 26;
 static const uint32_t TIMEOUT_MS = 60000;
 static const uint32_t REFINE_MS = 1500;
-static const uint32_t START_LIST[] = {0, 300000, 150000, 80000, 50000, 30000, 20000, 10000};  // 0 = sem limite
+// static const uint32_t START_LIST[] = {0, 300000, 150000, 80000, 50000, 30000, 20000, 10000};  // 0 = sem limite
+static const uint32_t START_LIST[] = {30000};
 static const uint8_t MAX_EXTRA = 20;  // máx. de budgets extras no refinamento automático
 static const uint32_t MIN_BUDGET = 5000;
 
