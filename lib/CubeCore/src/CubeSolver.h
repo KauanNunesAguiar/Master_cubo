@@ -18,6 +18,7 @@ class CubeSolver {
 	int verifyError() const { return _verr; }  // se solve() deu -1: -1 cor/peça inválida, -2..-6 = código do verify()
 	int solve(const CubeState& s, char* out, size_t outLen, uint8_t maxDepth = 30, uint32_t timeoutMs = 60000,
 	          uint32_t refineMs = 0);  // refineMs > 0: depois da 1ª solução, procura mais curtas por esse tempo
+	void setPhase2Budget(uint32_t n) { _p2Budget = n; }  // 0 = sem limite
 
    private:
 	static const uint8_t MAXD = 32;
@@ -26,8 +27,10 @@ class CubeSolver {
 	uint8_t _sol[MAXD];       // giro (0..17) de cada passo
 	uint8_t _best[MAXD];
 	uint8_t _len, _maxDepth, _p2Max;  // _p2Max = limite de giros da fase 2 no estágio atual
-	uint32_t _nodes, _t0, _timeout;
 	int8_t _verr;
+	uint32_t _nodes, _t0, _timeout;
+	uint32_t _p2Used, _p2Budget;
+	bool _p2Cut;
 	bool _abort;
 
 	bool tick();

@@ -15,11 +15,14 @@ CubeSolver::CubeSolver(W25Q16& flash)
       _len(0),
       _maxDepth(30),
       _p2Max(30),
+      _verr(0),
       _nodes(0),
       _t0(0),
       _timeout(0),
-      _abort(false),
-      _verr(0) {}
+      _p2Used(0),
+      _p2Budget(30000),
+      _p2Cut(false),
+      _abort(false) {}
 
 void CubeSolver::begin() { coordsInit(); }
 
@@ -80,6 +83,9 @@ bool CubeSolver::search1(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 }
 
 bool CubeSolver::phase2(uint8_t depth, int8_t lastFace) {
+	_p2Used = 0;
+	_p2Cut = false;
+
 	M_INC(solver.p2Calls);
 	S_EVT(EV_P1_G1, depth, 255);
 	M_SET(solver.sol1, depth);  // se esta chamada resolver, depth = giros da fase 1
@@ -101,12 +107,20 @@ bool CubeSolver::phase2(uint8_t depth, int8_t lastFace) {
 			break;
 		}
 		if (_abort) break;
+		if (_p2Cut) break;
 	}
+
+	if (_p2Cut) M_INC(solver.p2Cuts);
 	return ok;
 }
 
 bool CubeSolver::search2(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 	if (tick()) return false;
+	if (_p2Budget && ++_p2Used > _p2Budget) {
+		_p2Cut = true;
+		return false;
+	}
+
 	M_INC(solver.nodes2);
 	S_EVT(EV_P2_NODE, depth, depth ? _sol[depth - 1] : 255);
 
@@ -140,7 +154,7 @@ bool CubeSolver::search2(uint8_t depth, uint8_t remaining, int8_t lastFace) {
 		_cc[depth + 1].multiplyP2(c, moveCubie(m));
 		_sol[depth] = m;
 		if (search2(depth + 1, remaining - 1, face)) return true;
-		if (_abort) return false;
+		if (_abort || _p2Cut) return false;
 	}
 	return false;
 }

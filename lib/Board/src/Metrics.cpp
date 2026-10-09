@@ -63,8 +63,9 @@ void metricsPrintSolve(Print& out) {
 	           (unsigned)s.stage, (unsigned long)s.totalMs);
 	out.printf("[M] fase1: %lu ms (flash %lu ms)   fase2: %lu ms (flash %lu ms)\n", p1Us / 1000, fl1Us / 1000,
 	           p2Us / 1000, fl2Us / 1000);
-	out.printf("[M] nos: f1=%lu f2=%lu   G1 alcancado=%lu x   limites de f2 testados=%lu\n", (unsigned long)s.nodes1,
-	           (unsigned long)s.nodes2, (unsigned long)s.p2Calls, (unsigned long)s.p2Iters);
+	out.printf("[M] nos: f1=%lu f2=%lu   G1 alcancado=%lu x   lim de f2 testados=%lu   p2cut=%lu\n",
+	           (unsigned long)s.nodes1, (unsigned long)s.nodes2, (unsigned long)s.p2Calls, (unsigned long)s.p2Iters,
+	           (unsigned long)s.p2Cuts);
 	out.printf(
 	    "[M] flash: %lu leituras (ts=%lu fs=%lu cs=%lu us=%lu)  media %lu.%02lu us  total %lu ms = %lu%% do tempo\n",
 	    (unsigned long)reads, (unsigned long)f.reads[0], (unsigned long)f.reads[1], (unsigned long)f.reads[2],

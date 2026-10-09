@@ -32,6 +32,7 @@ struct MSolver {
 	uint32_t nodes1, nodes2;  // nós visitados em cada fase
 	uint32_t p2Calls;         // quantas vezes a fase 1 chegou em G1 e chamou a fase 2
 	uint32_t p2Iters;         // quantos limites de profundidade a fase 2 tentou (soma de todas as chamadas)
+	uint32_t p2Cuts;
 	uint32_t totalMs;
 	uint64_t p2Cycles;  // tempo dentro de phase2() (inclui a flash)
 	uint8_t sol1, solLen, stage;

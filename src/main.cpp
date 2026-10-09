@@ -42,7 +42,7 @@ TreeScreen treeScreen(tft, hud, screens, 0);
 static TaskHandle_t hDisplay, hSolve, hIn, hDisp, hLed, hMet;
 
 #if RUN_SELFTESTS
-static void selfTests() {
+static void selfTests(int testes_solver = 5) {
 	srand(12345);  // seed fixa: mesmo baseline em toda execução
 
 	// 1) Poda: a profundidade de qualquer estado alcançado com k giros tem que ser <= k
@@ -65,10 +65,9 @@ static void selfTests() {
 
 	// 2) Solver: mesmos parâmetros do HUD (embaralho de 30, maxDepth 26, timeout 60 s, refino 1500 ms)
 	{
-		const int N = 5;
 		int okCount = 0;
 		uint32_t sumMs = 0, sumLen = 0;
-		for (int n = 0; n < N; n++) {
+		for (int n = 0; n < testes_solver; n++) {
 			Serial.printf("Solver teste %d\n", n + 1);
 			CubeState s;
 			int last = -1;
@@ -94,10 +93,10 @@ static void selfTests() {
 			}
 		}
 		if (okCount)
-			Serial.printf("RESUMO: %d/%d resolvidos, media %lu giros, %lu ms\n", okCount, N,
+			Serial.printf("RESUMO: %d/%d resolvidos, media %lu giros, %lu ms\n", okCount, testes_solver,
 			              (unsigned long)(sumLen / okCount), (unsigned long)(sumMs / okCount));
 		else
-			Serial.printf("RESUMO: 0/%d resolvidos\n", N);
+			Serial.printf("RESUMO: 0/%d resolvidos\n", testes_solver);
 	}
 
 	// 3) verify(): canto torcido => solve() deve dar -1 com verifyError() = -5
@@ -232,7 +231,7 @@ void setup() {
 	Serial.printf("flash %s\n", flash.begin() ? "OK" : "ERRO");
 
 #if RUN_SELFTESTS
-	selfTests();
+	selfTests(50);
 #endif
 
 	tft.begin();
