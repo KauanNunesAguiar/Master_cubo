@@ -20,8 +20,10 @@
 #include "W25Q16.h"
 #include "stm32f4ve_peripherals.h"
 
-/* Autotestes no boot (poda + solver). Ponha 1 para ligar. */
-#define RUN_SELFTESTS 1
+/* Autotestes no boot (poda + solver). Para ligar sem editar o código: -D RUN_SELFTESTS=1 */
+#ifndef RUN_SELFTESTS
+#define RUN_SELFTESTS 0
+#endif
 
 TFT_FSMC tft;
 TouchXPT2046 touch;

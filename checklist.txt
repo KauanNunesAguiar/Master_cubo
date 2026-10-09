@@ -187,8 +187,14 @@ Dado: sizeof(CubieCube) = 40 (cp8+co8+ep12+eo12); _cc[33]=1320 B, g_m18=720 B
       sem cache de dados o acesso custa igual, shift/máscara no caminho quente).
       Reabrir só se quiser o resultado negativo medido para o TCC.
   [x] 7.5 Rank mais barato: JÁ TESTADO na Etapa 6B (máscara+popcount, sem ganho) -> encerrado
-  [ ] 7.6 Reorganização de libs
-  [ ] 7.7 Decidir RUN_SELFTESTS, WKUP e SOLVER_EVENTS no build final
+  [x] 7.6 Reorganização de libs: estrutura Board / CubeCore / CubeUI / Screens / Input
+      mantida (já coerente, sem mover arquivos). Limpeza feita:
+        - comentário do topo do CubeHUD.h atualizado (sem tftMutex/uiTask/patch)
+      Dependência registrada: CubeCore -> Board (PruneTable.h usa W25Q16.h e Metrics.h).
+  [x] 7.7 Build final decidido:
+        RUN_SELFTESTS = 0 por padrão (liga com -D RUN_SELFTESTS=1); boot sem os ~15 s
+        SOLVER_EVENTS = 1 mantido (TreeScreen é o foco do TCC; overhead +4,3%)
+        WKUP/taskMetrics mantido (coleta de dados para o TCC)
 
 ======================================================================
 DIAGNÓSTICO ATUAL (logs recentes)
@@ -210,6 +216,8 @@ CONFIABILIDADE (itens pendentes)
       confirmado: botão do encoder durante "BUSCANDO" não causa nada nem erro
   [ ] (baixa prioridade) _msg/_err lidos pela UI enquanto outra task escreve
   [ ] (baixa prioridade) isSolved()/stickersOk() lidos durante applyMove (só cosmético)
+  [ ] (baixa prioridade) PA7 é ENCODER_SW e LED_D3: não usar o LED D3 com o encoder
+  [ ] _cc fixo na CCM: só pode existir 1 CubeSolver por firmware
 
 ======================================================================
 REGRAS DE TRABALHO

@@ -1,18 +1,18 @@
 // CubeHUD.h
-// Interface completa do cubo mágico: painel lateral (status, cronômetro, barra, lista de giros,
-// estatísticas), botões de toque, embaralhar, "resolver" em segundo plano e cronômetro manual.
+// Interface do cubo mágico: painel lateral (status, cronômetro, barra, lista de giros,
+// estatísticas), botões de toque (SCRAMBLE / SOLVE), embaralhar, resolver em segundo
+// plano e cronômetro manual.
 //
 // Uso (resumo):
-//   CubeHUD hud(tft, cube, cubeState, solver, &touch);
-//   setup():  hud.begin(tftMutex);
-//             xTaskCreate(CubeHUD::uiTask,    "ui",    1024, &hud, 2, NULL);
-//             xTaskCreate(CubeHUD::solveTask, "solve", 1536, &hud, 1, NULL);
-//   Entradas: hud.requestSolve(), hud.scramble(), hud.selectFace(f), hud.turnSelected(cw)
+//   CubeHUD hud(tft, cube, cubeState, solver);
+//   setup():  hud.begin();   // depois de tft.begin() e cube.begin()
+//             xTaskCreate(CubeHUD::solveTask, "solve", 768, &hud, 1, &hSolve);
+//   A tela (HudScreen) chama hud.updateUI() na task "display"; só ela desenha no TFT.
+//   Entradas: requestSolve(), scramble(), selectFace(f), turnSelected(cw), onTouch(x, y)
 //
 // Regras:
-//  - Todo desenho no TFT é feito com o mutex passado em begin() (o mesmo da tarefa de render).
-//  - O CubeView precisa ter setOrigin() e pending() (ver patch).
-//  - Os textos não têm acento: a fonte padrão do Adafruit_GFX não tem.
+//  - Sem mutex: só a task "display" desenha (lock()/unlock() são vazios).
+//  - Os textos não têm acento: a fonte padrão do Adafruit_GFX não tem.conco
 #pragma once
 #include <Arduino.h>
 #include <STM32FreeRTOS.h>
