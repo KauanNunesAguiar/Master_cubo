@@ -1,6 +1,6 @@
 import serial, time, datetime
 
-PORT = "COM7"
+PORT = "com17"
 BAUD = 115200
 OUT = "sweep_log.txt"
 
