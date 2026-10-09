@@ -231,7 +231,10 @@ void setup() {
 	Serial.printf("flash %s\n", flash.begin() ? "OK" : "ERRO");
 
 #if RUN_SELFTESTS
-	selfTests(50);
+	Serial.printf("sizeof: CubieCube=%u CubeSolver=%u CubeHUD=%u SolverTrace=%u\n", (unsigned)sizeof(CubieCube),
+	              (unsigned)sizeof(CubeSolver), (unsigned)sizeof(CubeHUD), (unsigned)sizeof(SolverTrace));
+
+	selfTests(5);
 #endif
 
 	tft.begin();

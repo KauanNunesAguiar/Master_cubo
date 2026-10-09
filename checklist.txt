@@ -169,29 +169,20 @@ Objetivo: reduzir tempo médio e cauda de latência do solver, medindo cada pass
         Lição metodológica p/ o TCC: N=5 deu conclusão errada; N=200 corrigiu.
 
 ======================================================================
-ETAPA 7 - Reorganização de Libs, Tipos e Bitfields  [PRÓXIMA - NÃO INICIADA]
+ETAPA 7 - Reorganização de Libs, Tipos e Bitfields  [EM ANDAMENTO]
 ======================================================================
-Objetivo: otimização de memória/estruturas (somente no final).
-Regra: uma mudança por vez; medir antes e depois com o sweep (mesma seed, N>=100,
-       budget 30000) e comparar com o BASELINE OFICIAL 3. Mudança que não ganhar
-       fica documentada como experimento sem ganho e é revertida.
-  PASSO 0 - Medir a base (antes de mexer em qualquer coisa)
-  [ ] sizeof(CubieCube) atual (esperado 40 B) e sizeof das demais structs
-      (SolverTrace, MFlash/MSolver, CubeView, CubeHUD) via Serial no boot
-  [ ] RAM livre: heap FreeRTOS livre/mín (DebugScreen), malloc livre,
-      uso de .data/.bss/flash do programa (pio run: tabela RAM/Flash)
-  [ ] Rodar o sweep com budget 30000 (N=100 ou 200) e anotar como "base Etapa 7"
-  PASSO 1 - Compactação
-  [ ] Compactar CubieCube (cp/ep em 4 bits, co/eo em 2/1 bit) ou empacotar em
-      palavras; o solver copia/multiplica 1 cubo por nó -> medir tempo, não só RAM
-      (bitfields podem ficar MAIS LENTOS no Cortex-M4; aceitar só se medir ganho)
-  [ ] Avaliar _cc[MAXD+1] (33 cubos) e demais arrays do CubeSolver
-  [ ] Outras estruturas: CubeState (54 B), g_items do CubeView, TxtCache do HUD
-  PASSO 2 - Reorganização
-  [ ] Reorganização de bibliotecas (lib/Board, CubeCore, CubeUI, Input, Screens)
-  [ ] Reavaliar o dump serial do WKUP (taskMetrics) e o env:sweep como ferramenta
-      oficial de benchmark (documentar uso no README do projeto)
-  [ ] WKUP lido direto no taskMetrics: mover para o InputManager (adiado da Etapa 3)
+Dado: sizeof(CubieCube) = 40 (cp8+co8+ep12+eo12); _cc[33]=1320 B, g_m18=720 B
+  [~] 7.1 Medir baseline de RAM/Flash (linha "RAM:/Flash:" do build) e das structs grandes
+      RAM:   [=         ]   8.9% (used 11676 bytes from 131072 bytes)
+      Flash: [=         ]  14.6% (used 76480 bytes from 524288 bytes)
+      sizeof: CubieCube=40 CubeSolver=1460 CubeHUD=788 SolverTrace=704
+  [ ] 7.2 Mapear maiores consumidores de RAM (canvas 80 KB, g_items, SolverTrace, HUD)
+  [ ] 7.3 Experimento A: empacotar CubieCube (~20 B), medir RESUMO do selftest
+        critério: tempo médio <= 2300 ms +2%, mesmos 22 giros; senão, reverter
+  [ ] 7.4 Experimento B: mover _cc/g_m18 para CCM RAM (64 KB livres), medir
+  [ ] 7.5 (opcional) rank de cperm/udperm mais barato (item pendente da seção anterior)
+  [ ] 7.6 Reorganização de libs (Board / CubeCore / CubeUI / Screens / Input)
+  [ ] 7.7 Decidir sobre RUN_SELFTESTS, WKUP e SOLVER_EVENTS no build final
 
 ======================================================================
 DIAGNÓSTICO ATUAL (logs recentes)
